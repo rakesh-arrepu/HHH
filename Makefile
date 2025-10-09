@@ -36,15 +36,15 @@ backup:
 .PHONY: lint
 lint:
 	@echo "Running backend lint (black, isort)"
-	@source .venv/bin/activate && black --check . || true
-	@source .venv/bin/activate && isort --check-only . || true
+	@.venv/bin/black --check . || true
+	@.venv/bin/isort --check-only . || true
 	@echo "Running frontend lint (eslint)"
 	@cd frontend && npm run lint || true
 
 .PHONY: test
 test:
 	@echo "Running backend tests"
-	@source .venv/bin/activate && pip install -r backend/requirements/dev.txt || true
-	@source .venv/bin/activate && pytest -q backend/tests || true
+	@.venv/bin/python -m pip install -r backend/requirements/dev.txt || true
+	@.venv/bin/pytest -q backend/tests || true
 	@echo "Running frontend tests"
 	@cd frontend && npm run test || true

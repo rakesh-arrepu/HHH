@@ -24,7 +24,7 @@ jobs:
           node-version: '18'
       - name: Install frontend deps
         run: |
-          cd frontend && npm ci
+          cd frontend && npm install
       - name: Run frontend lint
         run: |
           cd frontend && npm install --legacy-peer-deps && npm run lint
