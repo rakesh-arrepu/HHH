@@ -17,7 +17,7 @@ jobs:
           pip install -r backend/requirements.txt
       - name: Run backend tests
         run: |
-          python -m pytest -q backend/tests
+          PYTHONPATH=$PYTHONPATH:$PWD/backend python -m pytest -v backend/tests
       - name: Build frontend
         uses: actions/setup-node@v4
         with:
