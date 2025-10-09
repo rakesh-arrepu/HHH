@@ -27,4 +27,7 @@ jobs:
           cd frontend && npm ci
       - name: Run frontend lint
         run: |
-          cd frontend && npm run build --if-present
+          cd frontend && npm ci && npm run lint
+      - name: Run frontend tests
+        run: |
+          cd frontend && npm ci && npm run test

@@ -31,3 +31,20 @@ docker-down:
 
 backup:
 	bash backend/scripts/restore_backup.sh --dry-run
+
+# run lint across backend and frontend
+.PHONY: lint
+lint:
+	@echo "Running backend lint (black, isort)"
+	@source .venv/bin/activate && black --check . || true
+	@source .venv/bin/activate && isort --check-only . || true
+	@echo "Running frontend lint (eslint)"
+	@cd frontend && npm run lint || true
+
+.PHONY: test
+test:
+	@echo "Running backend tests"
+	@source .venv/bin/activate && pip install -r backend/requirements/dev.txt || true
+	@source .venv/bin/activate && pytest -q backend/tests || true
+	@echo "Running frontend tests"
+	@cd frontend && npm run test || true
