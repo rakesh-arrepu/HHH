@@ -23,6 +23,6 @@ repos:
     hooks:
       - id: frontend-eslint
         name: frontend-eslint
-        entry: bash -c "cd frontend && npm ci && npm run lint"
+        entry: bash -c "cd frontend && npm install --no-audit --no-fund && npm run lint"
         language: system
         files: '\.(js|jsx|ts|tsx)$'
