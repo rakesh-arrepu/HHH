@@ -27,7 +27,7 @@ jobs:
           cd frontend && npm ci
       - name: Run frontend lint
         run: |
-          cd frontend && npm ci && npm run lint
+          cd frontend && npm install --legacy-peer-deps && npm run lint
       - name: Run frontend tests
         run: |
-          cd frontend && npm ci && npm run test
+          cd frontend && npm install --legacy-peer-deps && npm run test

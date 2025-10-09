@@ -6,7 +6,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint 'src/**/*.{ts,tsx,js,jsx}' --max-warnings=0 || true",
+    "lint": "eslint 'src/**/*.{ts,tsx,js,jsx}' --max-warnings=0",
     "test": "echo \"No frontend tests configured yet\" && exit 0"
+  },
+  "devDependencies": {
+    "eslint": "^9.37.0",
+    "eslint-plugin-react": "^7.32.2"
   }
 }
