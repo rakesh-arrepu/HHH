@@ -1,0 +1,1 @@
+# gdpr endpoints placeholder
