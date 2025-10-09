@@ -1,4 +1,10 @@
-const react = require('eslint-plugin-react');
+let react;
+try {
+  react = require('./frontend/node_modules/eslint-plugin-react');
+} catch (e) {
+  // fallback to normal resolution
+  react = require('eslint-plugin-react');
+}
 
 module.exports = [
   {
