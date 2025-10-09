@@ -19,9 +19,10 @@ repos:
       - id: isort
         language_version: python3.13
 
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.50.0
+  - repo: local
     hooks:
-      - id: eslint
+      - id: frontend-eslint
+        name: frontend-eslint
+        entry: bash -c "cd frontend && npm ci && npm run lint"
+        language: system
         files: '\.(js|jsx|ts|tsx)$'
-        additional_dependencies: ['eslint']
