@@ -1,5 +1,19 @@
 # Python
 __pycache__/
+*.py[cod]
+*.so
+
+# macOS
+.DS_Store
+
+# Local env files
+.env
+backend/.env
+
+# SQLite DB (development)
+backend/app.db
+# Python
+__pycache__/
 *.pyc
 .env
 
