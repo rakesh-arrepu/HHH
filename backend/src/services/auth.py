@@ -1,10 +1,11 @@
-from typing import Optional, Tuple, cast, Any
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone
+from typing import Any, Optional, Tuple, cast
 
-from core.security import get_password_hash, verify_password, create_access_token
+from core.security import (create_access_token, get_password_hash,
+                           verify_password)
 from models.user import User
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 def normalize_email(email: str) -> str:
