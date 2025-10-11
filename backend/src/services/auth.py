@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone
@@ -39,11 +39,13 @@ def create_user(db: Session, email: str, password: str, name: str) -> User:
 def authenticate_user(db: Session, email: str, password: str) -> Tuple[User, str]:
     email_n = normalize_email(email)
     user = get_user_by_email(db, email_n)
-    if not user or not verify_password(password, user.password_hash):
+    if not user:
+        raise ValueError("Invalid credentials")
+    if not verify_password(password, cast(str, user.password_hash)):
         raise ValueError("Invalid credentials")
 
     # Update last_login
-    user.last_login = datetime.now(timezone.utc)
+    cast(Any, user).last_login = datetime.now(timezone.utc)
     db.add(user)
     db.commit()
     db.refresh(user)

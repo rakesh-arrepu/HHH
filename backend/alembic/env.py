@@ -36,7 +36,10 @@ target_metadata = Base.metadata
 
 def get_database_url() -> str:
     # Use application settings; falls back to alembic.ini if not provided
-    return settings.database_url or config.get_main_option("sqlalchemy.url")
+    url = settings.database_url or config.get_main_option("sqlalchemy.url")
+    if not url:
+        raise RuntimeError("Database URL is not set in settings or alembic.ini")
+    return url
 
 
 def run_migrations_offline() -> None:
