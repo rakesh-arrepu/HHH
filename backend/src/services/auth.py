@@ -1,8 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Optional, Tuple, cast
 
-from core.security import (create_access_token, get_password_hash,
-                           verify_password)
+from core.security import create_access_token, get_password_hash, verify_password
 from models.user import User
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
