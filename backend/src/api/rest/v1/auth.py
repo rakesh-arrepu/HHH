@@ -45,15 +45,23 @@ def health():
     return {"status": "ok"}
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED
+)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     try:
-        user = create_user(db, email=payload.email, password=payload.password, name=payload.name)
+        user = create_user(
+            db, email=payload.email, password=payload.password, name=payload.name
+        )
     except ValueError as e:
         # Email already registered or integrity error
         detail = str(e)
         raise HTTPException(
-            status_code=(status.HTTP_409_CONFLICT if "already" in detail.lower() else status.HTTP_400_BAD_REQUEST),
+            status_code=(
+                status.HTTP_409_CONFLICT
+                if "already" in detail.lower()
+                else status.HTTP_400_BAD_REQUEST
+            ),
             detail=detail,
         )
 
@@ -65,8 +73,12 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 @router.post("/login", response_model=AuthResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     try:
-        user, token = authenticate_user(db, email=payload.email, password=payload.password)
+        user, token = authenticate_user(
+            db, email=payload.email, password=payload.password
+        )
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+        )
 
     return AuthResponse(token=token, user=UserOut.from_orm_user(user))
