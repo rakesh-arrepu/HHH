@@ -16,7 +16,7 @@ export default function CalendarView() {
     <div className="space-y-2">
       <div className="text-sm text-gray-600 mb-3">Last 7 days</div>
       <div className="grid grid-cols-7 gap-1">
-        {days.map((day, index) => (
+  {days.map((day) => (
           <div
             key={day.date}
             className={`aspect-square rounded-md flex items-center justify-center text-xs font-medium ${
