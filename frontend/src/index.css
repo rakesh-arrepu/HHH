@@ -1,2 +1,13 @@
-/* minimal css */
-body { font-family: system-ui, sans-serif; }
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  /* Fallback base styles to ensure CSS is visibly applied even if Tailwind fails */
+  background-color: #f9fafb; /* Tailwind gray-50 */
+  color: #111827;            /* Tailwind gray-900 */
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  min-height: 100vh;
+}
