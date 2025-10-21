@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     totp_issuer: str = "DailyTracker"
 
     # CORS
-    cors_allow_origins: List[str] = ["http://localhost:3000"]
+    cors_allow_origins: List[str] = ["http://localhost:5173", "http://localhost:5174"]
     cors_allow_credentials: bool = True
     cors_allow_methods: List[str] = ["*"]
     cors_allow_headers: List[str] = ["*"]

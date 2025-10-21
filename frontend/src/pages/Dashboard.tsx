@@ -1,16 +1,34 @@
 import React from 'react'
+import { gql } from '@apollo/client'
+import { useQuery } from '@apollo/client/react'
 import Analytics from '../components/dashboard/Analytics'
 import StreakCounter from '../components/dashboard/StreakCounter'
 import ProgressBar from '../components/dashboard/ProgressBar'
 import EntryForm from '../components/entries/EntryForm'
 import CalendarView from '../components/entries/CalendarView'
 
+const HEALTH_QUERY = gql`
+  query Health {
+    health
+  }
+`
+
 export default function Dashboard() {
+  const { data, loading, error } = useQuery<{ health: string }>(HEALTH_QUERY)
   return (
     <div className="space-y-8">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900">Daily Tracker Dashboard</h1>
         <p className="mt-2 text-gray-600">Track your daily progress and maintain your streaks</p>
+      </div>
+
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h2 className="text-lg font-semibold mb-2">API Status</h2>
+        {loading && <p className="text-gray-600">Checking GraphQL…</p>}
+        {error && <p className="text-red-600">GraphQL error: {error.message}</p>}
+        {!loading && !error && (
+          <p className="text-green-700">GraphQL health: {data?.health ?? 'unknown'}</p>
+        )}
       </div>
 
       {/* Analytics Overview */}

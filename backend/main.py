@@ -13,6 +13,8 @@ if SRC_DIR not in sys.path:
 from core.config import settings  # type: ignore  # noqa: E402
 from core.database import Base, engine  # type: ignore  # noqa: E402
 from api.rest.v1 import auth as auth_router  # type: ignore  # noqa: E402
+from strawberry.fastapi import GraphQLRouter  # type: ignore  # noqa: E402
+from api.graphql.schema import schema  # type: ignore  # noqa: E402
 
 
 app = FastAPI(title=settings.app_name, debug=settings.debug)
@@ -35,6 +37,8 @@ def on_startup():
 
 
 # Routers
+graphql_app = GraphQLRouter(schema)
+app.include_router(graphql_app, prefix="/graphql")
 app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["auth"])
 
 
