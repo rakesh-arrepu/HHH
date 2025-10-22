@@ -30,6 +30,8 @@ from services.analytics import (
 )
 from services.gdpr import export_user_data, delete_user_account
 from services.backup import trigger_backup, get_backup_logs
+from services.auth import create_user
+from core.security import create_access_token
 from models.audit import AuditLog as AuditLogModel
 from models.entry import SectionEntry as SectionEntryModel, SectionType as ModelSectionType
 from models.group import Group as GroupModel
@@ -155,6 +157,17 @@ class AuditLog:
   metadata: Optional[str]
   ip_address: Optional[str]
   created_at: str
+
+@strawberry.input
+class SignUpInput:
+  username: str
+  email: str
+  password: str
+
+@strawberry.type
+class SignUpPayload:
+  user: User
+  token: str
 
 @strawberry.type
 @dataclass
@@ -579,5 +592,12 @@ class Mutation:
       raise Exception("Super Admin access required.")
     with session_scope() as db:
       return trigger_backup(db, str(user.id))
+
+  @strawberry.mutation
+  def signUp(self, input: SignUpInput) -> SignUpPayload:
+    with session_scope() as db:
+      user = create_user(db, input.email, input.password, input.username)
+      token = create_access_token({"sub": user.id, "email": user.email})
+      return SignUpPayload(user=to_user_type(user), token=token)
 
 schema = strawberry.Schema(query=Query, mutation=Mutation)

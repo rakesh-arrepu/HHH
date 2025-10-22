@@ -1,3 +1,3 @@
 export default function useToast(){
-  return { show: (s:string)=>console.log(s) }
+  return { addToast: (message:string, options?: {type?: string}) => console.log(`${options?.type || 'info'}: ${message}`) }
 }

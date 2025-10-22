@@ -6,6 +6,7 @@ import Profile from './pages/Profile'
 import Admin from './pages/Admin'
 import LoginForm from './components/auth/LoginForm'
 import RegisterForm from './components/auth/RegisterForm'
+import SignUp from './pages/SignUp'
 import Header from './components/common/Header'
 import ErrorBoundary from './components/common/ErrorBoundary'
 
@@ -24,6 +25,7 @@ function App() {
               <Route path="/admin" element={<Admin />} />
               <Route path="/login" element={<LoginForm />} />
               <Route path="/register" element={<RegisterForm />} />
+              <Route path="/signup" element={<SignUp />} />
             </Routes>
           </main>
         </div>
