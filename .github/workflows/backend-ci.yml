@@ -31,4 +31,5 @@ jobs:
           DATABASE_URL: sqlite:///./ci_app.db
         run: |
           cd backend
+          rm -f test_app.db ci_app.db
           pytest -q

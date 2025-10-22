@@ -15,6 +15,16 @@ SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, futu
 
 Base = declarative_base()
 
+# Ensure all models are registered for create_all in dev/tests
+from models.user import User
+from models.group import Group
+from models.entry import SectionEntry
+from models.role import Role
+from models.group_member import GroupMember
+from models.notification import Notification
+from models.backup_log import BackupLog
+from models.audit import AuditLog
+
 
 def get_db() -> Generator:
     db = SessionLocal()

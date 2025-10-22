@@ -1,6 +1,12 @@
 import os
+import sys
 import uuid
 from typing import Dict, Any
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", "src"))
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
 
 # Use a file-based SQLite DB for integration tests to avoid in-memory connection issues
 os.environ["DATABASE_URL"] = "sqlite:///./test_app.db"
@@ -9,6 +15,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
 
+from core.database import Base, engine
+
+Base.metadata.create_all(bind=engine)
 
 client = TestClient(main.app)
 
