@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     cors_allow_methods: List[str] = ["*"]
     cors_allow_headers: List[str] = ["*"]
 
+    # Cookies/CSRF
+    csrf_cookie_name: str = "hhh_csrf"
+    csrf_header_name: str = "X-CSRF-Token"
+    cookie_domain: str = "localhost"
+    secure_cookies: bool = False
+    access_cookie_name: str = "hhh_at"
+    refresh_cookie_name: str = "hhh_rt"
+
     class Config:
         env_file = ".env"
         case_sensitive = False

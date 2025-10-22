@@ -1,15 +1,17 @@
 # Security utilities: password hashing, JWT creation/verification, and TOTP helpers.
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
+from uuid import uuid4
 
 import jwt  # PyJWT
 import pyotp
 from passlib.context import CryptContext
+from fastapi import Response
 
 from .config import settings
 
 # Password hashing (bcrypt)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def get_password_hash(password: str) -> str:
@@ -31,7 +33,7 @@ def create_access_token(
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=expires_minutes if expires_minutes is not None else settings.access_token_exp_minutes
     )
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
     token = jwt.encode(
         to_encode,
         key=secret or settings.jwt_secret,
@@ -50,7 +52,9 @@ def create_refresh_token(
     expire = datetime.now(timezone.utc) + timedelta(
         days=expires_days if expires_days is not None else settings.refresh_token_exp_days
     )
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update(
+        {"exp": expire, "type": "refresh", "iat": datetime.now(timezone.utc), "jti": str(uuid4())}
+    )
     token = jwt.encode(
         to_encode,
         key=secret or settings.jwt_secret,
@@ -83,3 +87,51 @@ def verify_totp_code(secret: str, code: str, valid_window: int = 1) -> bool:
     """valid_window allows slight clock skew (e.g., 30s steps)."""
     totp = pyotp.TOTP(secret)
     return totp.verify(code, valid_window=valid_window)
+
+
+# Cookie helpers for httpOnly JWT cookies
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """
+    Set httpOnly cookies for access and refresh tokens.
+    - SameSite=Lax for CSRF-safe default
+    - Secure flag from settings.secure_cookies
+    - Domain from settings.cookie_domain (or host-only if empty)
+    Note: We set both cookies in a single 'set-cookie' header so a single header read includes both cookies.
+    """
+    def build_cookie(name: str, value: str) -> str:
+        parts = [
+            f"{name}={value}",
+            "HttpOnly",
+            "Path=/",
+            "SameSite=lax",
+        ]
+        if settings.secure_cookies:
+            parts.append("Secure")
+        if settings.cookie_domain:
+            parts.append(f"Domain={settings.cookie_domain}")
+        return "; ".join(parts)
+
+    access_cookie = build_cookie(settings.access_cookie_name, access_token)
+    refresh_cookie = build_cookie(settings.refresh_cookie_name, refresh_token)
+    response.headers["set-cookie"] = f"{access_cookie}, {refresh_cookie}"
+
+
+def clear_auth_cookies(response: Response) -> None:
+    """Clear access and refresh cookies."""
+    def expired_cookie(name: str) -> str:
+        parts = [
+            f"{name}=; Max-Age=0",
+            "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+            "HttpOnly",
+            "Path=/",
+            "SameSite=lax",
+        ]
+        if settings.secure_cookies:
+            parts.append("Secure")
+        if settings.cookie_domain:
+            parts.append(f"Domain={settings.cookie_domain}")
+        return "; ".join(parts)
+
+    access_del = expired_cookie(settings.access_cookie_name)
+    refresh_del = expired_cookie(settings.refresh_cookie_name)
+    response.headers["set-cookie"] = f"{access_del}, {refresh_del}"

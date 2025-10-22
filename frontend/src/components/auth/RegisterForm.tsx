@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { API_URL } from '../../lib/constants'
+import { csrfHeaders } from '../../lib/csrf'
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -28,15 +30,35 @@ export default function RegisterForm() {
     }
 
     setIsLoading(true)
-
-    // TODO: Implement actual registration logic with API
-    console.log('Registration attempt:', formData)
-
-    // Simulate registration for now
-    setTimeout(() => {
+    try {
+      const headers = await csrfHeaders()
+      const name = `${formData.firstName} ${formData.lastName}`.trim()
+      const res = await fetch(`${API_URL}/api/v1/auth/register`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          name,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        const msg = (data && data.detail) || 'Registration failed'
+        throw new Error(String(msg))
+      }
+      // Successful register sets cookies and returns user; redirect to dashboard or login
+      navigate('/dashboard')
+    } catch (err) {
+      // eslint-disable-next-line no-alert
+      alert((err as Error).message)
+    } finally {
       setIsLoading(false)
-      navigate('/login')
-    }, 1000)
+    }
   }
 
   return (

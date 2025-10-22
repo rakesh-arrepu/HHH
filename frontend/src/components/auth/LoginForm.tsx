@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { API_URL } from '../../lib/constants'
+import { csrfHeaders } from '../../lib/csrf'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -10,15 +12,30 @@ export default function LoginForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
-
-    // TODO: Implement actual login logic with API
-    console.log('Login attempt:', { email, password })
-
-    // Simulate login for now
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      const headers = await csrfHeaders()
+      const res = await fetch(`${API_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+        },
+        body: JSON.stringify({ email, password }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        const msg = (data && data.detail) || 'Login failed'
+        throw new Error(String(msg))
+      }
+      // Successful login sets httpOnly cookies; navigate to dashboard
       navigate('/dashboard')
-    }, 1000)
+    } catch (err) {
+      // eslint-disable-next-line no-alert
+      alert((err as Error).message)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

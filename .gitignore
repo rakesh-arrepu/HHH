@@ -21,3 +21,11 @@ __pycache__/
 # Node
 node_modules/
 /dist
+frontend/dist/
+
+# Local debug/test artifacts
+cookies.txt
+csrf_cookies.txt
+headers.txt
+gql_localhost.json
+graphql_health.json

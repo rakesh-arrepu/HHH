@@ -4,8 +4,13 @@ from datetime import date
 from dataclasses import dataclass
 
 from core.database import session_scope
-from services.entry import list_entries_today as svc_list_entries_today
-from models.entry import SectionEntry as SectionEntryModel
+from services.entry import (
+  list_entries_today as svc_list_entries_today,
+  create_entry as svc_create_entry,
+  update_entry as svc_update_entry,
+  soft_delete_entry as svc_soft_delete_entry,
+)
+from models.entry import SectionEntry as SectionEntryModel, SectionType as ModelSectionType
 from enum import Enum as PyEnum
 
 
@@ -29,6 +34,20 @@ class Entry:
   edit_count: int
   is_flagged: bool
   flagged_reason: Optional[str]
+
+
+@strawberry.input
+class CreateEntryInput:
+  user_id: str
+  group_id: str
+  section_type: SectionType
+  content: str
+  entry_date: Optional[date] = None
+
+@strawberry.input
+class UpdateEntryInput:
+  content: Optional[str] = None
+  section_type: Optional[SectionType] = None
 
 
 def to_entry_type(m: SectionEntryModel) -> Entry:
@@ -59,4 +78,35 @@ class Query:
       return [to_entry_type(i) for i in items]
 
 
-schema = strawberry.Schema(query=Query)
+@strawberry.type
+class Mutation:
+  @strawberry.mutation
+  def create_entry(self, input: CreateEntryInput) -> Entry:
+    with session_scope() as db:
+      m = svc_create_entry(
+        db,
+        user_id=input.user_id,
+        group_id=input.group_id,
+        section_type=ModelSectionType(input.section_type.value),
+        content=input.content,
+        entry_date=input.entry_date,
+      )
+      return to_entry_type(m)
+
+  @strawberry.mutation
+  def update_entry(self, id: str, input: UpdateEntryInput) -> Entry:
+    with session_scope() as db:
+      m = svc_update_entry(
+        db,
+        entry_id=id,
+        content=input.content if (input and input.content is not None) else None,
+        section_type=ModelSectionType(input.section_type.value) if (input and input.section_type is not None) else None,
+      )
+      return to_entry_type(m)
+
+  @strawberry.mutation
+  def delete_entry(self, id: str) -> bool:
+    with session_scope() as db:
+      return svc_soft_delete_entry(db, entry_id=id)
+
+schema = strawberry.Schema(query=Query, mutation=Mutation)

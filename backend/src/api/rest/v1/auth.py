@@ -2,12 +2,13 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from core.database import get_db
-from core.security import create_access_token
+from core.config import settings
+from core.security import create_access_token, create_refresh_token, set_auth_cookies, clear_auth_cookies, decode_token
 from services.auth import authenticate_user, create_user
 
 
@@ -24,8 +25,7 @@ class UserOut(BaseModel):
         return cls(id=user.id, email=user.email, name=user.name)
 
 
-class AuthResponse(BaseModel):
-    token: str
+class AuthUserResponse(BaseModel):
     user: UserOut
 
 
@@ -46,9 +46,9 @@ def health():
 
 
 @router.post(
-    "/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED
+    "/register", response_model=AuthUserResponse, status_code=status.HTTP_201_CREATED
 )
-def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+def register(payload: RegisterRequest, response: Response, db: Session = Depends(get_db)):
     try:
         user = create_user(
             db, email=payload.email, password=payload.password, name=payload.name
@@ -65,15 +65,17 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             detail=detail,
         )
 
-    # Auto-login after registration
-    token = create_access_token({"sub": user.id, "email": user.email})
-    return AuthResponse(token=token, user=UserOut.from_orm_user(user))
+    # Issue session cookies (access + refresh)
+    access = create_access_token({"sub": user.id, "email": user.email})
+    refresh = create_refresh_token({"sub": user.id, "email": user.email})
+    set_auth_cookies(response, access, refresh)
+    return AuthUserResponse(user=UserOut.from_orm_user(user))
 
 
-@router.post("/login", response_model=AuthResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+@router.post("/login", response_model=AuthUserResponse)
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
     try:
-        user, token = authenticate_user(
+        user, access = authenticate_user(
             db, email=payload.email, password=payload.password
         )
     except ValueError:
@@ -81,4 +83,31 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
 
-    return AuthResponse(token=token, user=UserOut.from_orm_user(user))
+    refresh = create_refresh_token({"sub": user.id, "email": user.email})
+    set_auth_cookies(response, access, refresh)
+    return AuthUserResponse(user=UserOut.from_orm_user(user))
+
+
+@router.post("/refresh")
+def refresh(request: Request, response: Response):
+    token = request.cookies.get(settings.refresh_cookie_name)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
+    try:
+        payload = decode_token(token)
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    sub = payload.get("sub")
+    email = payload.get("email")
+    access = create_access_token({"sub": sub, "email": email})
+    refresh_new = create_refresh_token({"sub": sub, "email": email})
+    set_auth_cookies(response, access, refresh_new)
+    return {"status": "ok"}
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response):
+    clear_auth_cookies(response)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

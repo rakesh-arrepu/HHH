@@ -15,6 +15,7 @@ from core.database import Base, engine  # type: ignore  # noqa: E402
 from api.rest.v1 import auth as auth_router  # type: ignore  # noqa: E402
 from strawberry.fastapi import GraphQLRouter  # type: ignore  # noqa: E402
 from api.graphql.schema import schema  # type: ignore  # noqa: E402
+from api.middleware.csrf import CSRFMiddleware  # type: ignore  # noqa: E402
 
 
 app = FastAPI(title=settings.app_name, debug=settings.debug)
@@ -27,6 +28,8 @@ app.add_middleware(
     allow_methods=settings.cors_allow_methods,
     allow_headers=settings.cors_allow_headers,
 )
+
+app.add_middleware(CSRFMiddleware)
 
 
 @app.on_event("startup")
