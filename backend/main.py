@@ -13,6 +13,9 @@ if SRC_DIR not in sys.path:
 from core.config import settings  # type: ignore  # noqa: E402
 from core.database import Base, engine  # type: ignore  # noqa: E402
 from api.rest.v1 import auth as auth_router  # type: ignore  # noqa: E402
+from api.rest.v1.roles import router as roles_router  # type: ignore  # noqa: E402
+from api.rest.v1.analytics import router as analytics_router  # type: ignore  # noqa: E402
+from api.rest.v1.backup import router as backup_router  # type: ignore  # noqa: E402
 from strawberry.fastapi import GraphQLRouter  # type: ignore  # noqa: E402
 from api.graphql.schema import schema  # type: ignore  # noqa: E402
 from api.middleware.csrf import CSRFMiddleware  # type: ignore  # noqa: E402
@@ -43,6 +46,9 @@ def on_startup():
 graphql_app = GraphQLRouter(schema)
 app.include_router(graphql_app, prefix="/graphql")
 app.include_router(auth_router.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(roles_router, prefix="/api/v1/roles", tags=["roles"])
+app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
+app.include_router(backup_router, prefix="/api/v1/backups", tags=["backups"])
 
 
 @app.get("/")

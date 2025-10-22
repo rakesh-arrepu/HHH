@@ -2,6 +2,7 @@ import strawberry
 from typing import List, Optional, cast
 from datetime import date
 from dataclasses import dataclass
+import pyotp
 
 from core.database import session_scope
 from services.entry import (
@@ -9,8 +10,30 @@ from services.entry import (
   create_entry as svc_create_entry,
   update_entry as svc_update_entry,
   soft_delete_entry as svc_soft_delete_entry,
+  list_user_entries as svc_list_user_entries,
+  get_entry_by_id as svc_get_entry_by_id,
+  get_daily_progress as svc_get_daily_progress,
+  calculate_streak as svc_calculate_streak,
+  restore_entry as svc_restore_entry,
 )
+from services.notification import (
+  get_user_notifications as svc_get_user_notifications,
+  mark_notification_read as svc_mark_notification_read,
+  mark_all_notifications_read as svc_mark_all_notifications_read,
+)
+from services.role import promote_to_group_admin, demote_to_user, soft_delete_user
+from services.group import (
+  create_group, update_group, get_user_groups, get_group_by_id, add_member, remove_member, list_groups
+)
+from services.analytics import (
+  get_group_analytics, get_global_analytics, flag_entry, unflag_entry, get_audit_logs
+)
+from services.gdpr import export_user_data, delete_user_account
+from services.backup import trigger_backup, get_backup_logs
+from models.audit import AuditLog as AuditLogModel
 from models.entry import SectionEntry as SectionEntryModel, SectionType as ModelSectionType
+from models.group import Group as GroupModel
+from models.group_member import GroupMember as GroupMemberModel
 from enum import Enum as PyEnum
 
 
@@ -50,6 +73,16 @@ class UpdateEntryInput:
   section_type: Optional[SectionType] = None
 
 
+@strawberry.type
+@dataclass
+class DailyProgress:
+  date: str
+  total_entries: int
+  completed_sections: int
+  total_sections: int
+  progress_percentage: float
+  entries: List[Entry]
+
 def to_entry_type(m: SectionEntryModel) -> Entry:
   return Entry(
     id=cast(str, m.id),
@@ -63,6 +96,98 @@ def to_entry_type(m: SectionEntryModel) -> Entry:
     flagged_reason=cast(Optional[str], m.flagged_reason),
   )
 
+def to_daily_progress_type(progress_data: dict) -> DailyProgress:
+  return DailyProgress(
+    date=progress_data["date"],
+    total_entries=progress_data["total_entries"],
+    completed_sections=progress_data["completed_sections"],
+    total_sections=progress_data["total_sections"],
+    progress_percentage=progress_data["progress_percentage"],
+    entries=[to_entry_type(e) for e in progress_data["entries"]],
+  )
+
+
+@strawberry.type
+@dataclass
+class User:
+  id: str
+  email: str
+  name: str
+
+@strawberry.type
+@dataclass
+class GroupMember:
+  id: str
+  user: User
+  group: "Group"  # Forward reference
+  day_streak: int
+  joined_at: str
+
+@strawberry.type
+@dataclass
+class Group:
+  id: str
+  name: str
+  description: str
+  timezone: str
+  admin: User
+  members: List[GroupMember]
+  created_at: str
+
+@strawberry.type
+@dataclass
+class Notification:
+  id: str
+  type: str
+  title: str
+  message: str
+  is_read: bool
+  created_at: str
+
+@strawberry.type
+@dataclass
+class AuditLog:
+  id: str
+  user_id: str
+  action: str
+  resource_type: str
+  resource_id: str
+  metadata: Optional[str]
+  ip_address: Optional[str]
+  created_at: str
+
+@strawberry.type
+@dataclass
+class MutationResponse:
+  success: bool
+  message: str
+
+def to_user_type(user_model) -> User:
+  return User(
+    id=str(user_model.id),
+    email=user_model.email,
+    name=user_model.name,
+  )
+
+def to_group_member_type(member_model) -> GroupMember:
+  return GroupMember(
+    id=str(member_model.id),
+    user=to_user_type(member_model.user),
+    group=None,  # type: ignore # Avoid circular
+    day_streak=member_model.day_streak,
+    joined_at=str(member_model.joined_at),
+  )
+
+def to_group_type(group_model) -> Group:
+  return Group(
+    id=str(group_model.id),
+    name=group_model.name,
+    description=group_model.description or "",
+    timezone=group_model.timezone,
+    admin=to_user_type(group_model.admin) if group_model.admin is not None else None,  # type: ignore
+    members=[to_group_member_type(m) for m in group_model.members] if hasattr(group_model, 'members') else [],
+    created_at=str(group_model.created_at),
+  )
 
 @strawberry.type
 class Query:
@@ -71,15 +196,188 @@ class Query:
     return "ok"
 
   @strawberry.field
+  def me(self, info) -> User:
+    user = info.context["user"]
+    return to_user_type(user)
+
+  @strawberry.field
+  def myGroups(self, info) -> List[Group]:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      return []
+    with session_scope() as db:
+      groups = get_user_groups(db, str(user.id))
+      return [to_group_type(g) for g in groups]
+
+  @strawberry.field
+  def group(self, info, id: str) -> Optional[Group]:
+    with session_scope() as db:
+      try:
+        g = get_group_by_id(db, id)
+        return to_group_type(g)
+      except:
+        return None
+
+  @strawberry.field
+  def groups(self, info, limit: Optional[int] = 10, offset: Optional[int] = 0) -> List[Group]:
+    with session_scope() as db:
+      groups = list_groups(db, limit=limit or 10, offset=offset or 0)
+      return [to_group_type(g) for g in groups]
+
+  @strawberry.field
   def entries_today(self, user_id: str, group_id: Optional[str] = None) -> List[Entry]:
     # Minimal resolver wiring to service layer; uses a short-lived session scope
     with session_scope() as db:
       items = svc_list_entries_today(db, user_id=user_id, group_id=group_id)
       return [to_entry_type(i) for i in items]
 
+  @strawberry.field
+  def myEntries(self, info, groupId: Optional[str] = None, limit: Optional[int] = 50, offset: Optional[int] = 0) -> List[Entry]:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      return []
+    with session_scope() as db:
+      entries = svc_list_user_entries(db, str(user.id), groupId, limit or 50, offset or 0)
+      return [to_entry_type(e) for e in entries]
+
+  @strawberry.field
+  def entry(self, info, id: str) -> Optional[Entry]:
+    with session_scope() as db:
+      try:
+        e = svc_get_entry_by_id(db, id)
+        return to_entry_type(e)
+      except:
+        return None
+
+  @strawberry.field
+  def dailyProgress(self, info, date: date, groupId: Optional[str] = None) -> DailyProgress:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    with session_scope() as db:
+      progress = svc_get_daily_progress(db, str(user.id), date, groupId)
+      return to_daily_progress_type(progress)
+
+  @strawberry.field
+  def streak(self, info, groupId: Optional[str] = None) -> int:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      return 0
+    with session_scope() as db:
+      return svc_calculate_streak(db, str(user.id), groupId)
+
+  @strawberry.field
+  def myNotifications(self, info, limit: Optional[int] = 50, offset: Optional[int] = 0) -> List[Notification]:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      return []
+    with session_scope() as db:
+      notifications = svc_get_user_notifications(db, str(user.id), limit or 50, offset or 0)
+      return [Notification(
+        id=str(n.id),
+        type=n.type.value,  # type: ignore
+        title=n.title,  # type: ignore
+        message=n.message,  # type: ignore
+        is_read=n.is_read,  # type: ignore
+        created_at=str(n.created_at),
+      ) for n in notifications]
+
+  @strawberry.field
+  def groupAnalytics(self, info, groupId: str, startDate: Optional[date] = None, endDate: Optional[date] = None) -> dict:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    with session_scope() as db:
+      return get_group_analytics(db, groupId, startDate, endDate)
+
+  @strawberry.field
+  def globalAnalytics(self, info, startDate: Optional[date] = None, endDate: Optional[date] = None) -> dict:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    # Check if user is Super Admin
+    if not hasattr(user, "role") or user.role.name != "SUPER_ADMIN":  # type: ignore
+      raise Exception("Super Admin access required.")
+    with session_scope() as db:
+      return get_global_analytics(db, startDate, endDate)
+
+  @strawberry.field
+  def auditLogs(self, info, limit: Optional[int] = 50, offset: Optional[int] = 0, userId: Optional[str] = None,
+                action: Optional[str] = None, resourceType: Optional[str] = None) -> List[AuditLog]:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    # Check if user is Super Admin
+    if not hasattr(user, "role") or user.role.name != "SUPER_ADMIN":  # type: ignore
+      raise Exception("Super Admin access required.")
+    with session_scope() as db:
+      logs = get_audit_logs(db, limit or 50, offset or 0, userId, action, resourceType)
+      return [AuditLog(
+        id=str(log.id),
+        user_id=str(log.user_id),
+        action=log.action,  # type: ignore
+        resource_type=log.resource_type,  # type: ignore
+        resource_id=str(log.resource_id),
+        metadata=str(log.metadata) if log.metadata else None,  # type: ignore
+        ip_address=log.ip_address,  # type: ignore
+        created_at=str(log.created_at),
+      ) for log in logs]
+
 
 @strawberry.type
 class Mutation:
+  @strawberry.mutation
+  def enable2fa(self, info) -> str:
+    # NOTE: Customize this according to actual context structure if needed.
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    if not hasattr(user, "role") or (getattr(user.role, "name", None) != "SUPER_ADMIN"):
+      raise Exception("Only Super Admin can enable 2FA.")
+    if user is not None and hasattr(user, "is_2fa_enabled") and hasattr(user, "totp_secret"):
+      if getattr(user, "is_2fa_enabled", False) and getattr(user, "totp_secret", None):  # type: ignore
+        raise Exception("2FA is already enabled.")
+
+    # Generate secret and provisioning URI
+    totp_secret = pyotp.random_base32()
+    user.totp_secret = totp_secret
+    user.is_2fa_enabled = False
+
+    # Persist to DB
+    with session_scope() as db:
+      db_user = db.query(type(user)).filter_by(id=user.id).first()
+      if db_user:
+        db_user.totp_secret = totp_secret  # type: ignore
+        db_user.is_2fa_enabled = False  # type: ignore
+        db.commit()
+
+    provisioning_uri = pyotp.totp.TOTP(totp_secret).provisioning_uri(user.email, issuer_name="DailyTracker")
+    return provisioning_uri
+
+  @strawberry.mutation
+  def verify2fa(self, info, totp_code: str) -> bool:
+    """Verify the 2FA TOTP code and enable 2FA on the account."""
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    if not hasattr(user, "role") or (getattr(user.role, "name", None) != "SUPER_ADMIN"):
+      raise Exception("Only Super Admin can verify 2FA.")
+    if not getattr(user, "totp_secret", None):
+      raise Exception("2FA secret not initialized. Please run enable2fa first.")
+
+    totp_secret = cast(str, getattr(user, "totp_secret", None))
+    totp = pyotp.TOTP(totp_secret)
+    if not totp.verify(totp_code):
+      return False
+
+    # Persist enablement to DB
+    with session_scope() as db:
+      db_user = db.query(type(user)).filter_by(id=user.id).first()
+      if db_user:
+        db_user.is_2fa_enabled = True  # type: ignore
+        db.commit()
+    return True
+
   @strawberry.mutation
   def create_entry(self, input: CreateEntryInput) -> Entry:
     with session_scope() as db:
@@ -108,5 +406,178 @@ class Mutation:
   def delete_entry(self, id: str) -> bool:
     with session_scope() as db:
       return svc_soft_delete_entry(db, entry_id=id)
+
+  @strawberry.mutation
+  def promoteToGroupAdmin(self, info, userId: str, groupId: str) -> MutationResponse:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      return MutationResponse(success=False, message="User must be authenticated.")
+    try:
+      with session_scope() as db:
+        message = promote_to_group_admin(db, str(user.id), userId, groupId)
+      return MutationResponse(success=True, message=message)
+    except Exception as e:
+      return MutationResponse(success=False, message=str(e))
+
+  @strawberry.mutation
+  def demoteToUser(self, info, userId: str, groupId: str) -> MutationResponse:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      return MutationResponse(success=False, message="User must be authenticated.")
+    try:
+      with session_scope() as db:
+        message = demote_to_user(db, str(user.id), userId, groupId)
+      return MutationResponse(success=True, message=message)
+    except Exception as e:
+      return MutationResponse(success=False, message=str(e))
+
+  @strawberry.mutation
+  def softDeleteUser(self, info, userId: str, confirm: bool) -> MutationResponse:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      return MutationResponse(success=False, message="User must be authenticated.")
+    if not confirm:
+      return MutationResponse(success=False, message="Confirmation required.")
+    try:
+      with session_scope() as db:
+        message = soft_delete_user(db, str(user.id), userId)
+      return MutationResponse(success=True, message=message)
+    except Exception as e:
+      return MutationResponse(success=False, message=str(e))
+
+  @strawberry.mutation
+  def createGroup(self, info, name: str, description: Optional[str] = None, timezone: Optional[str] = None) -> Group:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    with session_scope() as db:
+      g = create_group(db, name, description or "", timezone or "Asia/Kolkata", str(user.id))
+      return to_group_type(g)
+
+  @strawberry.mutation
+  def updateGroup(self, info, id: str, name: Optional[str] = None, description: Optional[str] = None, timezone: Optional[str] = None) -> Group:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    with session_scope() as db:
+      g = update_group(db, id, name=name, description=description, timezone=timezone)  # type: ignore
+      return to_group_type(g)
+
+  @strawberry.mutation
+  def addGroupMember(self, info, groupId: str, userId: str) -> GroupMember:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    with session_scope() as db:
+      m = add_member(db, groupId, userId)
+      return to_group_member_type(m)
+
+  @strawberry.mutation
+  def removeGroupMember(self, info, groupId: str, userId: str, confirm: bool) -> MutationResponse:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    if not confirm:
+      return MutationResponse(success=False, message="Confirmation required.")
+    try:
+      with session_scope() as db:
+        message = remove_member(db, groupId, userId)
+      return MutationResponse(success=True, message=message)
+    except Exception as e:
+      return MutationResponse(success=False, message=str(e))
+
+  @strawberry.mutation
+  def restoreEntry(self, info, id: str) -> Entry:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    with session_scope() as db:
+      e = svc_restore_entry(db, id=id, user_id=str(user.id))  # type: ignore
+      return to_entry_type(e)
+
+  @strawberry.mutation
+  def markNotificationRead(self, info, id: str) -> Notification:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    with session_scope() as db:
+      n = svc_mark_notification_read(db, id, str(user.id))
+      return Notification(
+        id=str(n.id),
+        type=n.type.value,  # type: ignore
+        title=n.title,  # type: ignore
+        message=n.message,  # type: ignore
+        is_read=n.is_read,  # type: ignore
+        created_at=str(n.created_at),
+      )
+
+  @strawberry.mutation
+  def markAllNotificationsRead(self, info) -> MutationResponse:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      return MutationResponse(success=False, message="User must be authenticated.")
+    try:
+      with session_scope() as db:
+        count = svc_mark_all_notifications_read(db, str(user.id))
+      return MutationResponse(success=True, message=f"Marked {count} notifications as read.")
+    except Exception as e:
+      return MutationResponse(success=False, message=str(e))
+
+  @strawberry.mutation
+  def flagEntry(self, info, entryId: str, reason: str) -> Entry:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    # Check if user is Super Admin
+    if not hasattr(user, "role") or user.role.name != "SUPER_ADMIN":  # type: ignore
+      raise Exception("Super Admin access required.")
+    with session_scope() as db:
+      entry = flag_entry(db, entryId, reason, str(user.id))
+      return to_entry_type(entry)
+
+  @strawberry.mutation
+  def unflagEntry(self, info, entryId: str) -> Entry:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    # Check if user is Super Admin
+    if not hasattr(user, "role") or user.role.name != "SUPER_ADMIN":  # type: ignore
+      raise Exception("Super Admin access required.")
+    with session_scope() as db:
+      entry = unflag_entry(db, entryId, str(user.id))
+      return to_entry_type(entry)
+
+  @strawberry.mutation
+  def exportMyData(self, info) -> dict:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    with session_scope() as db:
+      return export_user_data(db, str(user.id))
+
+  @strawberry.mutation
+  def deleteMyAccount(self, info, confirm: bool) -> MutationResponse:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      return MutationResponse(success=False, message="User must be authenticated.")
+    if not confirm:
+      return MutationResponse(success=False, message="Confirmation required. This action cannot be undone.")
+    try:
+      with session_scope() as db:
+        message = delete_user_account(db, str(user.id))
+      return MutationResponse(success=True, message=message)
+    except Exception as e:
+      return MutationResponse(success=False, message=str(e))
+
+  @strawberry.mutation
+  def triggerBackup(self, info) -> dict:
+    user = info.context.get("user") if hasattr(info.context, "get") else None
+    if not user:
+      raise Exception("User must be authenticated.")
+    # Check if user is Super Admin
+    if not hasattr(user, "role") or user.role.name != "SUPER_ADMIN":  # type: ignore
+      raise Exception("Super Admin access required.")
+    with session_scope() as db:
+      return trigger_backup(db, str(user.id))
 
 schema = strawberry.Schema(query=Query, mutation=Mutation)

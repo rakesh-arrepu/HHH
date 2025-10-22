@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from core.database import get_db
 from core.config import settings
-from core.security import create_access_token, create_refresh_token, set_auth_cookies, clear_auth_cookies, decode_token
+from core.security import create_access_token, create_refresh_token, set_auth_cookies, clear_auth_cookies, decode_token, get_current_user
 from services.auth import authenticate_user, create_user
 
 
@@ -111,3 +111,56 @@ def refresh(request: Request, response: Response):
 def logout(response: Response):
     clear_auth_cookies(response)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- 2FA Endpoints ---
+
+import pyotp
+from fastapi import Request
+
+@router.post("/2fa/enable")
+def enable_2fa(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    """Begin 2FA setup for a Super Admin user and return TOTP QR provisioning URI."""
+    raise Exception("REACHED HANDLER - enable_2fa")
+    import logging
+    logging.warning(
+        f"DEBUG enable_2fa - user: {user} user.role: {getattr(user, 'role', None)} user.role.name: {getattr(getattr(user, 'role', None), 'name', None)} user.is_2fa_enabled: {getattr(user, 'is_2fa_enabled', None)} user.totp_secret: {getattr(user, 'totp_secret', None)}"
+    )
+    if not hasattr(user, "role") or (getattr(user.role, "name", None) != "SUPER_ADMIN"):
+        raise HTTPException(status_code=403, detail="Only Super Admin can enable 2FA")
+    if getattr(user, "is_2fa_enabled", False) and getattr(user, "totp_secret", None):
+        raise HTTPException(status_code=409, detail="2FA already enabled")
+
+    # Generate new secret and save
+    totp_secret = pyotp.random_base32()
+    user.totp_secret = totp_secret
+    user.is_2fa_enabled = False
+    db.commit()
+    provisioning_uri = pyotp.totp.TOTP(totp_secret).provisioning_uri(user.email, issuer_name="DailyTracker")
+    return {"provisioning_uri": provisioning_uri}
+
+from pydantic import BaseModel
+
+class TotpVerifyRequest(BaseModel):
+    totp_code: str
+
+@router.post("/2fa/verify")
+def verify_2fa(
+    payload: TotpVerifyRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    """Verify TOTP code to enable 2FA for Super Admin users."""
+    if not hasattr(user, "role") or (getattr(user.role, "name", None) != "SUPER_ADMIN"):
+        raise HTTPException(status_code=403, detail="Only Super Admin can verify 2FA")
+    if not getattr(user, "totp_secret", None):
+        raise HTTPException(status_code=400, detail="2FA not initialized")
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(payload.totp_code):
+        raise HTTPException(status_code=401, detail="Invalid 2FA code")
+    user.is_2fa_enabled = True
+    db.commit()
+    return {"2fa_enabled": True}

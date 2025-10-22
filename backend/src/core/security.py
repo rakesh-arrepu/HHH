@@ -10,6 +10,8 @@ from fastapi import Response
 
 from .config import settings
 
+from fastapi import Request, HTTPException
+
 # Password hashing (bcrypt)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
@@ -88,6 +90,14 @@ def verify_totp_code(secret: str, code: str, valid_window: int = 1) -> bool:
     totp = pyotp.TOTP(secret)
     return totp.verify(code, valid_window=valid_window)
 
+# Auth dependency for FastAPI endpoints
+
+def get_current_user(request: Request):
+    """Dependency to retrieve the user from request or raise 401."""
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
 
 # Cookie helpers for httpOnly JWT cookies
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
