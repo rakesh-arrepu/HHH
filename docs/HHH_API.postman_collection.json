@@ -1,0 +1,187 @@
+{
+  "info": {
+    "name": "HHH Project – Full API Collection",
+    "description": "Comprehensive Postman collection for all REST and GraphQL endpoints in the HHH project. Environment variable {{base_url}} is used for portability. Includes CSRF-secure flows, cookie usage, and request/response samples.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "default"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth – Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/health",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "health"]
+        },
+        "description": "Returns API liveness and sets CSRF cookie."
+      }
+    },
+    {
+      "name": "Auth – Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "name": "X-CSRF-Token",
+            "value": "{{csrf_token}}",
+            "description": "Required: Value of hhh_csrf cookie; must be obtained by first visiting /health."
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"name\": \"John Doe\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/register",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "register"]
+        },
+        "description": "Registers a new user. Requires CSRF token in header, which must match hhh_csrf cookie."
+      }
+    },
+    {
+      "name": "Auth – Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "name": "X-CSRF-Token",
+            "value": "{{csrf_token}}",
+            "description": "Required: Value of hhh_csrf cookie, which must be fetched via /health."
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "description": "Logs in a user. Requires CSRF token."
+      }
+    },
+    {
+      "name": "Auth – Refresh",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRF-Token",
+            "name": "X-CSRF-Token",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/refresh",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "refresh"]
+        },
+        "description": "Refreshes access/refresh cookies using the refresh cookie; requires CSRF."
+      }
+    },
+    {
+      "name": "Auth – Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-CSRF-Token",
+            "name": "X-CSRF-Token",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/logout",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "logout"]
+        },
+        "description": "Logs out the user, clears cookies. Requires CSRF."
+      }
+    },
+    {
+      "name": "GraphQL – Health Query (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/graphql?query={health}",
+          "host": ["{{base_url}}"],
+          "path": ["graphql"],
+          "query": [
+            { "key": "query", "value": "{health}" }
+          ]
+        },
+        "description": "GraphQL health check. No CSRF required."
+      }
+    },
+    {
+      "name": "GraphQL – Generic Query (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/graphql?query={{gql_query}}&variables={{gql_variables}}",
+          "host": ["{{base_url}}"],
+          "path": ["graphql"],
+          "query": [
+            { "key": "query", "value": "{{gql_query}}" },
+            { "key": "variables", "value": "{{gql_variables}}" }
+          ]
+        },
+        "description": "Send any GraphQL query (GET). Fill variables as needed."
+      }
+    },
+    {
+      "name": "GraphQL – Mutation (POST)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "name": "X-CSRF-Token",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"mutation ($input: CreateEntryInput!) { createEntry(input: $input) { id content section_type } }\",\n  \"variables\": {\n    \"input\": {\n      \"user_id\": \"USER_ID\",\n      \"group_id\": \"GROUP_ID\",\n      \"section_type\": \"Health\",\n      \"content\": \"Walked 5k steps\"\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/graphql",
+          "host": ["{{base_url}}"],
+          "path": ["graphql"]
+        },
+        "description": "Perform GraphQL mutations. CSRF token required."
+      }
+    }
+  ]
+}

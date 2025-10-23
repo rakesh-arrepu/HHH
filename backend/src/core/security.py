@@ -7,6 +7,7 @@ import jwt  # PyJWT
 import pyotp
 from passlib.context import CryptContext
 from fastapi import Response
+import secrets
 
 from .config import settings
 
@@ -98,6 +99,29 @@ def get_current_user(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return user
+
+# CSRF cookie setter
+def set_csrf_cookie(response: Response):
+    """
+    Set (non-httpOnly) CSRF cookie. Used for CSRF protection.
+    - Name is settings.csrf_cookie_name (default hhh_csrf)
+    - Not httpOnly, SameSite=lax, Path=/, Secure in prod, Domain as configured
+    """
+    name = settings.csrf_cookie_name
+    value = secrets.token_urlsafe(32)
+    parts = [
+        f"{name}={value}",
+        "Path=/",
+        "SameSite=lax",
+    ]
+    if settings.secure_cookies:
+        parts.append("Secure")
+    if settings.cookie_domain:
+        parts.append(f"Domain={settings.cookie_domain}")
+    # DO NOT mark httpOnly, cookie must be JS-accessible
+    cookie_header = "; ".join(parts)
+    response.headers.append("set-cookie", cookie_header)
+    return value
 
 # Cookie helpers for httpOnly JWT cookies
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:

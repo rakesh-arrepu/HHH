@@ -40,8 +40,11 @@ class LoginRequest(BaseModel):
     password: str
 
 
+from core.security import set_csrf_cookie
+
 @router.get("/health")
-def health():
+def health(response: Response):
+    set_csrf_cookie(response)
     return {"status": "ok"}
 
 

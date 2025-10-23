@@ -37,11 +37,18 @@ def create_user(db: Session, email: str, password: str, name: str) -> User:
 
 
 def authenticate_user(db: Session, email: str, password: str) -> Tuple[User, str]:
+    import logging
     email_n = normalize_email(email)
+    logging.warning(f"[AUTH_DEBUG] Called with email='{email}', normalized='{email_n}'")
     user = get_user_by_email(db, email_n)
+    logging.warning(f"[AUTH_DEBUG] User found: {user is not None}, DB user email: {getattr(user, 'email', None)}")
     if not user:
+        logging.error("[AUTH_DEBUG] No user found for normalized email.")
         raise ValueError("Invalid credentials")
-    if not verify_password(password, cast(str, user.password_hash)):
+    pw_check = verify_password(password, cast(str, user.password_hash))
+    logging.warning(f"[AUTH_DEBUG] Password hash check result for email='{email_n}': {pw_check}")
+    if not pw_check:
+        logging.error("[AUTH_DEBUG] Password verification failed.")
         raise ValueError("Invalid credentials")
 
     # Update last_login
@@ -52,4 +59,5 @@ def authenticate_user(db: Session, email: str, password: str) -> Tuple[User, str
 
     # Create access token (JWT)
     token = create_access_token({"sub": user.id, "email": user.email})
+    logging.warning(f"[AUTH_DEBUG] Login successful for {email_n}")
     return user, token
