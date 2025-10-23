@@ -26,6 +26,16 @@ function App() {
               <Route path="/login" element={<LoginForm />} />
               <Route path="/register" element={<RegisterForm />} />
               <Route path="/signup" element={<SignUp />} />
+              <Route
+                path="*"
+                element={
+                  <div className="flex flex-col items-center mt-20">
+                    <span className="text-4xl font-bold text-red-600 mb-4">404</span>
+                    <span className="text-lg font-semibold mb-2">Page Not Found</span>
+                    <span className="text-gray-600">The page you are looking for does not exist.</span>
+                  </div>
+                }
+              />
             </Routes>
           </main>
         </div>

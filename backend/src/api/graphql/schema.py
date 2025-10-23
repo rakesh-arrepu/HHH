@@ -158,6 +158,50 @@ class AuditLog:
   ip_address: Optional[str]
   created_at: str
 
+# --- Analytics GraphQL Types ---
+@strawberry.type
+class PeriodType:
+  start: str
+  end: str
+
+@strawberry.type
+class DailyActivityType:
+  date: str
+  entries: int
+
+@strawberry.type
+class GroupAnalyticsResult:
+  group_id: str
+  period: PeriodType
+  member_count: int
+  total_entries: int
+  active_users: int
+  avg_streak: float
+  daily_activity: List[DailyActivityType]
+
+@strawberry.type
+class GlobalAnalyticsResult:
+  period: PeriodType
+  total_users: int
+  total_groups: int
+  total_entries: int
+  new_users: int
+  active_users: int
+  active_groups: int
+  engagement_rate: float
+
+@strawberry.type
+class ExportResult:
+  success: bool
+  data: Optional[str]
+  message: Optional[str]
+
+@strawberry.type
+class BackupResult:
+  success: bool
+  backup_id: Optional[str]
+  message: Optional[str]
+
 @strawberry.input
 class SignUpInput:
   username: str
@@ -296,15 +340,29 @@ class Query:
       ) for n in notifications]
 
   @strawberry.field
-  def groupAnalytics(self, info, groupId: str, startDate: Optional[date] = None, endDate: Optional[date] = None) -> dict:
+  def groupAnalytics(self, info, groupId: str, startDate: Optional[date] = None, endDate: Optional[date] = None) -> GroupAnalyticsResult:
     user = info.context.get("user") if hasattr(info.context, "get") else None
     if not user:
       raise Exception("User must be authenticated.")
     with session_scope() as db:
-      return get_group_analytics(db, groupId, startDate, endDate)
+      result = get_group_analytics(db, groupId, startDate, endDate)
+      return GroupAnalyticsResult(
+        group_id=result["group_id"],
+        period=PeriodType(**result["period"]),
+        member_count=result["member_count"],
+        total_entries=result["total_entries"],
+        active_users=result["active_users"],
+        avg_streak=float(result["avg_streak"]),
+        daily_activity=[
+          DailyActivityType(
+            date=activity["date"], entries=activity["entries"]
+          )
+          for activity in result.get("daily_activity", [])
+        ]
+      )
 
   @strawberry.field
-  def globalAnalytics(self, info, startDate: Optional[date] = None, endDate: Optional[date] = None) -> dict:
+  def globalAnalytics(self, info, startDate: Optional[date] = None, endDate: Optional[date] = None) -> GlobalAnalyticsResult:
     user = info.context.get("user") if hasattr(info.context, "get") else None
     if not user:
       raise Exception("User must be authenticated.")
@@ -312,7 +370,17 @@ class Query:
     if not hasattr(user, "role") or user.role.name != "SUPER_ADMIN":  # type: ignore
       raise Exception("Super Admin access required.")
     with session_scope() as db:
-      return get_global_analytics(db, startDate, endDate)
+      result = get_global_analytics(db, startDate, endDate)
+      return GlobalAnalyticsResult(
+        period=PeriodType(**result["period"]),
+        total_users=result["total_users"],
+        total_groups=result["total_groups"],
+        total_entries=result["total_entries"],
+        new_users=result["new_users"],
+        active_users=result["active_users"],
+        active_groups=result["active_groups"],
+        engagement_rate=float(result["engagement_rate"]),
+      )
 
   @strawberry.field
   def auditLogs(self, info, limit: Optional[int] = 50, offset: Optional[int] = 0, userId: Optional[str] = None,
@@ -561,12 +629,17 @@ class Mutation:
       return to_entry_type(entry)
 
   @strawberry.mutation
-  def exportMyData(self, info) -> dict:
+  def exportMyData(self, info) -> ExportResult:
     user = info.context.get("user") if hasattr(info.context, "get") else None
     if not user:
       raise Exception("User must be authenticated.")
     with session_scope() as db:
-      return export_user_data(db, str(user.id))
+      result = export_user_data(db, str(user.id))
+      return ExportResult(
+        success=result.get("success", True),
+        data=result.get("data", None),
+        message=result.get("message", None)
+      )
 
   @strawberry.mutation
   def deleteMyAccount(self, info, confirm: bool) -> MutationResponse:
@@ -583,7 +656,7 @@ class Mutation:
       return MutationResponse(success=False, message=str(e))
 
   @strawberry.mutation
-  def triggerBackup(self, info) -> dict:
+  def triggerBackup(self, info) -> BackupResult:
     user = info.context.get("user") if hasattr(info.context, "get") else None
     if not user:
       raise Exception("User must be authenticated.")
@@ -591,7 +664,12 @@ class Mutation:
     if not hasattr(user, "role") or user.role.name != "SUPER_ADMIN":  # type: ignore
       raise Exception("Super Admin access required.")
     with session_scope() as db:
-      return trigger_backup(db, str(user.id))
+      result = trigger_backup(db, str(user.id))
+      return BackupResult(
+        success=result.get("success", True),
+        backup_id=result.get("backup_id", None),
+        message=result.get("message", None)
+      )
 
   @strawberry.mutation
   def signUp(self, input: SignUpInput) -> SignUpPayload:
