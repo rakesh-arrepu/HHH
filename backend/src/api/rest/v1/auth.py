@@ -10,6 +10,7 @@ from core.database import get_db
 from core.config import settings
 from core.security import create_access_token, create_refresh_token, set_auth_cookies, clear_auth_cookies, decode_token, get_current_user
 from services.auth import authenticate_user, create_user
+from models.user import User
 
 
 router = APIRouter()
@@ -127,22 +128,23 @@ def enable_2fa(
     user=Depends(get_current_user)
 ):
     """Begin 2FA setup for a Super Admin user and return TOTP QR provisioning URI."""
-    raise Exception("REACHED HANDLER - enable_2fa")
-    import logging
-    logging.warning(
-        f"DEBUG enable_2fa - user: {user} user.role: {getattr(user, 'role', None)} user.role.name: {getattr(getattr(user, 'role', None), 'name', None)} user.is_2fa_enabled: {getattr(user, 'is_2fa_enabled', None)} user.totp_secret: {getattr(user, 'totp_secret', None)}"
-    )
     if not hasattr(user, "role") or (getattr(user.role, "name", None) != "SUPER_ADMIN"):
         raise HTTPException(status_code=403, detail="Only Super Admin can enable 2FA")
-    if getattr(user, "is_2fa_enabled", False) and getattr(user, "totp_secret", None):
+
+    # Load the same user within this DB session to avoid cross-session assignment issues
+    db_user: User | None = db.query(User).filter_by(id=str(user.id)).first()  # type: ignore
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if getattr(db_user, "is_2fa_enabled", False) and getattr(db_user, "totp_secret", None):
         raise HTTPException(status_code=409, detail="2FA already enabled")
 
     # Generate new secret and save
     totp_secret = pyotp.random_base32()
-    user.totp_secret = totp_secret
-    user.is_2fa_enabled = False
+    db_user.totp_secret = totp_secret
+    db_user.is_2fa_enabled = False
     db.commit()
-    provisioning_uri = pyotp.totp.TOTP(totp_secret).provisioning_uri(user.email, issuer_name="DailyTracker")
+    provisioning_uri = pyotp.totp.TOTP(totp_secret).provisioning_uri(db_user.email, issuer_name="DailyTracker")
     return {"provisioning_uri": provisioning_uri}
 
 from pydantic import BaseModel
@@ -159,11 +161,19 @@ def verify_2fa(
     """Verify TOTP code to enable 2FA for Super Admin users."""
     if not hasattr(user, "role") or (getattr(user.role, "name", None) != "SUPER_ADMIN"):
         raise HTTPException(status_code=403, detail="Only Super Admin can verify 2FA")
-    if not getattr(user, "totp_secret", None):
+
+    # Load user in this DB session
+    db_user: User | None = db.query(User).filter_by(id=str(user.id)).first()  # type: ignore
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not getattr(db_user, "totp_secret", None):
         raise HTTPException(status_code=400, detail="2FA not initialized")
-    totp = pyotp.TOTP(user.totp_secret)
+
+    totp = pyotp.TOTP(db_user.totp_secret)  # type: ignore
     if not totp.verify(payload.totp_code):
         raise HTTPException(status_code=401, detail="Invalid 2FA code")
-    user.is_2fa_enabled = True
+
+    db_user.is_2fa_enabled = True
     db.commit()
     return {"2fa_enabled": True}

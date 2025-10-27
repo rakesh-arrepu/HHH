@@ -44,7 +44,7 @@ def authenticate_user(db: Session, email: str, password: str) -> Tuple[User, str
     logging.warning(f"[AUTH_DEBUG] User found: {user is not None}, DB user email: {getattr(user, 'email', None)}")
     if not user:
         logging.error("[AUTH_DEBUG] No user found for normalized email.")
-        raise ValueError("Invalid credentials")
+        raise ValueError("User Not Found")
     pw_check = verify_password(password, cast(str, user.password_hash))
     logging.warning(f"[AUTH_DEBUG] Password hash check result for email='{email_n}': {pw_check}")
     if not pw_check:

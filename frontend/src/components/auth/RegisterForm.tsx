@@ -12,6 +12,7 @@ export default function RegisterForm() {
     lastName: ''
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,11 +26,12 @@ export default function RegisterForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match')
+      setError('Passwords do not match')
       return
     }
 
     setIsLoading(true)
+    setError(null)
     try {
       const headers = await csrfHeaders()
       const name = `${formData.firstName} ${formData.lastName}`.trim()
@@ -54,8 +56,7 @@ export default function RegisterForm() {
       // Successful register sets cookies and returns user; redirect to dashboard or login
       navigate('/dashboard')
     } catch (err) {
-      // eslint-disable-next-line no-alert
-      alert((err as Error).message)
+      setError((err as Error).message)
     } finally {
       setIsLoading(false)
     }
@@ -75,7 +76,12 @@ export default function RegisterForm() {
             </Link>
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        {error && (
+          <div role="alert" className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit} aria-busy={isLoading} aria-live="polite">
           <div className="space-y-4">
             <div>
               <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
@@ -86,6 +92,7 @@ export default function RegisterForm() {
                 name="firstName"
                 type="text"
                 required
+                disabled={isLoading}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="First name"
                 value={formData.firstName}
@@ -101,6 +108,7 @@ export default function RegisterForm() {
                 name="lastName"
                 type="text"
                 required
+                disabled={isLoading}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Last name"
                 value={formData.lastName}
@@ -116,6 +124,7 @@ export default function RegisterForm() {
                 name="email"
                 type="email"
                 required
+                disabled={isLoading}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Email address"
                 value={formData.email}
@@ -131,6 +140,7 @@ export default function RegisterForm() {
                 name="password"
                 type="password"
                 required
+                disabled={isLoading}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Password"
                 value={formData.password}
@@ -146,6 +156,7 @@ export default function RegisterForm() {
                 name="confirmPassword"
                 type="password"
                 required
+                disabled={isLoading}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Confirm password"
                 value={formData.confirmPassword}

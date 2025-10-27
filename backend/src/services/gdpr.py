@@ -26,7 +26,7 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
         "name": user.name,
         "role": user.role.name if user.role else None,
         "created_at": user.created_at.isoformat() if user.created_at is not None else None,  # type: ignore
-        "updated_at": user.updated_at.isoformat() if user.updated_at is not None else None,  # type: ignore
+        "updated_at": (getattr(user, "updated_at", None).isoformat() if getattr(user, "updated_at", None) else None),
         "is_2fa_enabled": getattr(user, "is_2fa_enabled", False),
         "timezone": getattr(user, "timezone", None),
     }

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 
 export default function Header() {
   const navigate = useNavigate()
@@ -12,27 +12,44 @@ export default function Header() {
             <Link to="/" className="text-xl font-bold text-blue-600">
               Daily Tracker
             </Link>
-            <nav className="hidden md:flex space-x-6">
-              <Link to="/dashboard" className="text-gray-700 hover:text-blue-600">
+            <nav className="hidden md:flex space-x-6" role="navigation" aria-label="Main">
+              <NavLink
+                to="/dashboard"
+                className={({ isActive }) =>
+                  `text-gray-700 hover:text-blue-600 ${isActive ? 'font-semibold underline underline-offset-4' : ''}`
+                }
+              >
                 Dashboard
-              </Link>
-              <Link to="/groups" className="text-gray-700 hover:text-blue-600">
+              </NavLink>
+              <NavLink
+                to="/groups"
+                className={({ isActive }) =>
+                  `text-gray-700 hover:text-blue-600 ${isActive ? 'font-semibold underline underline-offset-4' : ''}`
+                }
+              >
                 Groups
-              </Link>
-              <Link to="/profile" className="text-gray-700 hover:text-blue-600">
+              </NavLink>
+              <NavLink
+                to="/profile"
+                className={({ isActive }) =>
+                  `text-gray-700 hover:text-blue-600 ${isActive ? 'font-semibold underline underline-offset-4' : ''}`
+                }
+              >
                 Profile
-              </Link>
+              </NavLink>
             </nav>
           </div>
           <div className="flex items-center space-x-4">
             <button
               onClick={() => navigate('/login')}
+              aria-label="Log in"
               className="text-gray-700 hover:text-blue-600"
             >
               Login
             </button>
             <button
               onClick={() => navigate('/register')}
+              aria-label="Create an account"
               className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
               Sign Up

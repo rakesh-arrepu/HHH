@@ -34,9 +34,33 @@ def trigger_backup(db: Session, user_id: str) -> Dict[str, Any]:
                 "-f", backup_path
             ]
         else:
-            # SQLite backup (development)
+            # SQLite backup (development) - file copy fallback (no sqlite3 CLI dependency)
             db_path = engine.url.database
-            cmd = ["sqlite3", db_path, ".backup", backup_path]
+            import shutil
+            shutil.copyfile(db_path, backup_path)
+            backup_size = os.path.getsize(backup_path)
+
+            # Log successful backup
+            backup_log = BackupLog(
+                backup_file=backup_filename,
+                backup_size=backup_size,
+                status=BackupStatus.SUCCESS
+            )
+            db.add(backup_log)
+            db.commit()
+            db.refresh(backup_log)
+
+            # Clean up local file (in production, this would be uploaded to cloud storage)
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+
+            return {
+                "success": True,
+                "message": "Backup completed successfully",
+                "backup_file": backup_filename,
+                "backup_size": backup_size,
+                "backup_id": backup_log.id
+            }
 
         # Execute backup command
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -109,7 +133,7 @@ def get_backup_logs(db: Session, limit: int = 50, offset: int = 0) -> List[Dict[
         "id": log.id,
         "backup_file": log.backup_file,
         "backup_size": log.backup_size,
-        "status": log.status.value,
+        "status": str(log.status),
         "created_at": log.created_at.isoformat()
     } for log in logs]
 

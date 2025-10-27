@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload, joinedload
 from sqlalchemy.sql import func
 from fastapi import HTTPException
 from typing import Optional
@@ -36,12 +36,28 @@ def get_user_groups(db: Session, user_id: str) -> list[Group]:
     """Get all groups where user is a member."""
     memberships = db.query(GroupMember).filter_by(user_id=user_id, deleted_at=None).all()
     group_ids = [m.group_id for m in memberships]
-    groups = db.query(Group).filter(Group.id.in_(group_ids), Group.deleted_at == None).all()
+    groups = (
+        db.query(Group)
+        .filter(Group.id.in_(group_ids), Group.deleted_at == None)
+        .options(
+            selectinload(Group.admin),
+            selectinload(Group.members).selectinload(GroupMember.user),
+        )
+        .all()
+    )
     return groups
 
 def get_group_by_id(db: Session, group_id: str) -> Group:
     """Get group by ID with admin and members."""
-    group = db.query(Group).filter_by(id=group_id, deleted_at=None).first()
+    group = (
+        db.query(Group)
+        .filter_by(id=group_id, deleted_at=None)
+        .options(
+            selectinload(Group.admin),
+            selectinload(Group.members).selectinload(GroupMember.user),
+        )
+        .first()
+    )
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     return group
@@ -75,7 +91,17 @@ def remove_member(db: Session, group_id: str, user_id: str) -> str:
 
 def list_groups(db: Session, limit: int = 10, offset: int = 0) -> list[Group]:
     """List all active groups (paginated)."""
-    groups = db.query(Group).filter_by(deleted_at=None).offset(offset).limit(limit).all()
+    groups = (
+        db.query(Group)
+        .filter_by(deleted_at=None)
+        .options(
+            selectinload(Group.admin),
+            selectinload(Group.members).selectinload(GroupMember.user),
+        )
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return groups
 
 def soft_delete_group(db: Session, group_id: str) -> str:

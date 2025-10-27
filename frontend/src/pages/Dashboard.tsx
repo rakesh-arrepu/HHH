@@ -6,6 +6,7 @@ import StreakCounter from '../components/dashboard/StreakCounter'
 import ProgressBar from '../components/dashboard/ProgressBar'
 import EntryForm from '../components/entries/EntryForm'
 import CalendarView from '../components/entries/CalendarView'
+import EntryList from '../components/entries/EntryList'
 
 const HEALTH_QUERY = gql`
   query Health {
@@ -51,6 +52,12 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold mb-4">Your Progress Calendar</h2>
           <CalendarView />
         </div>
+      </div>
+
+      {/* Recent Entries */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h2 className="text-xl font-semibold mb-4">Recent Entries</h2>
+        <EntryList limit={10} />
       </div>
 
       {/* Quick Actions */}

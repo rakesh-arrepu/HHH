@@ -7,11 +7,13 @@ export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
     try {
       const headers = await csrfHeaders()
       const res = await fetch(`${API_URL}/api/v1/auth/login`, {
@@ -31,8 +33,7 @@ export default function LoginForm() {
       // Successful login sets httpOnly cookies; navigate to dashboard
       navigate('/dashboard')
     } catch (err) {
-      // eslint-disable-next-line no-alert
-      alert((err as Error).message)
+      setError((err as Error).message)
     } finally {
       setIsLoading(false)
     }
@@ -52,7 +53,12 @@ export default function LoginForm() {
             </Link>
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        {error && (
+          <div role="alert" className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit} aria-busy={isLoading} aria-live="polite">
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">
@@ -62,7 +68,10 @@ export default function LoginForm() {
                 id="email"
                 name="email"
                 type="email"
+                autoComplete="email"
+                inputMode="email"
                 required
+                disabled={isLoading}
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                 placeholder="Email address"
                 value={email}
@@ -77,7 +86,9 @@ export default function LoginForm() {
                 id="password"
                 name="password"
                 type="password"
+                autoComplete="current-password"
                 required
+                disabled={isLoading}
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                 placeholder="Password"
                 value={password}

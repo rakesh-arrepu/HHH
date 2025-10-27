@@ -212,6 +212,98 @@ Errors
 
 --------------------------------------------------------------------------------
 
+REST: Backup Endpoints (/api/v1/backups)
+
+Notes
+- All backup endpoints require Super Admin privileges.
+- CSRF header (X-CSRF-Token) is required for POST /trigger.
+- Cookies: Send credentials (httpOnly cookies) with requests.
+
+Trigger Backup
+- POST /api/v1/backups/trigger
+- Headers:
+  - X-CSRF-Token: <value_of_hhh_csrf_cookie>
+- Response (200 OK):
+  {
+    "success": true,
+    "message": "Backup completed successfully",
+    "backup_file": "backup_20250101_120000.sql",
+    "backup_size": 123456,
+    "backup_id": "uuid"
+  }
+- Errors:
+  - 403 { "code": "ERR_SUPERADMIN_REQUIRED", "message": "Super Admin access required", "details": {"endpoint": "trigger"}, "correlationId": "...", "path": "/api/v1/backups/trigger", "timestamp": "..." }
+  - 500 { "code": "ERR_BACKUP_FAILED", "message": "Backup failed: <details>", "details": {"endpoint": "trigger"}, "correlationId": "...", "path": "/api/v1/backups/trigger", "timestamp": "..." }
+
+Backup Logs
+- GET /api/v1/backups/logs?limit=50&offset=0
+- Response (200 OK):
+  [
+    {
+      "id": "uuid",
+      "backup_file": "backup_20250101_120000.sql",
+      "backup_size": 123456,
+      "status": "BackupStatus.SUCCESS",
+      "created_at": "2025-01-01T12:00:00+00:00"
+    }
+  ]
+- Errors:
+  - 403 { "code": "ERR_SUPERADMIN_REQUIRED", "message": "Super Admin access required", "details": {"endpoint": "logs"}, "correlationId": "...", "path": "/api/v1/backups/logs", "timestamp": "..." }
+  - 500 { "code": "ERR_BACKUP_LOGS_FAILED", "message": "Failed to retrieve backup logs: <details>", "details": {"endpoint": "logs"}, "correlationId": "...", "path": "/api/v1/backups/logs", "timestamp": "..." }
+
+Backup Stats
+- GET /api/v1/backups/stats
+- Response (200 OK):
+  {
+    "total_backups": 10,
+    "successful_backups": 9,
+    "failed_backups": 1,
+    "total_backup_size": 10485760,
+    "latest_backup": {
+      "file": "backup_20250101_120000.sql",
+      "size": 123456,
+      "created_at": "2025-01-01T12:00:00+00:00"
+    }
+  }
+- Errors:
+  - 403 { "code": "ERR_SUPERADMIN_REQUIRED", "message": "Super Admin access required", "details": {"endpoint": "stats"}, "correlationId": "...", "path": "/api/v1/backups/stats", "timestamp": "..." }
+  - 500 { "code": "ERR_BACKUP_STATS_FAILED", "message": "Failed to retrieve backup stats: <details>", "details": {"endpoint": "stats"}, "correlationId": "...", "path": "/api/v1/backups/stats", "timestamp": "..." }
+
+--------------------------------------------------------------------------------
+
+Analytics Response Shapes (GraphQL)
+
+Group Analytics
+- Query: groupAnalytics(groupId: String!, startDate?: Date, endDate?: Date): GroupAnalyticsResult
+- Shape:
+  {
+    "group_id": "uuid",
+    "period": { "start": "2025-01-01", "end": "2025-01-31" },
+    "member_count": 12,
+    "total_entries": 345,
+    "active_users": 8,
+    "avg_streak": 4.2,
+    "daily_activity": [
+      { "date": "2025-01-01", "entries": 12 }
+    ]
+  }
+
+Global Analytics
+- Query: globalAnalytics(startDate?: Date, endDate?: Date): GlobalAnalyticsResult (Super Admin only)
+- Shape:
+  {
+    "period": { "start": "2025-01-01", "end": "2025-01-31" },
+    "total_users": 120,
+    "total_groups": 15,
+    "total_entries": 1200,
+    "new_users": 10,
+    "active_users": 75,
+    "active_groups": 9,
+    "engagement_rate": 0.62
+  }
+
+--------------------------------------------------------------------------------
+
 Frontend Guidelines
 - Apollo client:
   - Use credentials: 'include'

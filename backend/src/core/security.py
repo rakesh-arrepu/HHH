@@ -12,6 +12,7 @@ import secrets
 from .config import settings
 
 from fastapi import Request, HTTPException
+from core.exceptions import UnauthorizedError
 
 # Password hashing (bcrypt)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -97,7 +98,8 @@ def get_current_user(request: Request):
     """Dependency to retrieve the user from request or raise 401."""
     user = getattr(request.state, "user", None)
     if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        # Use standardized AppError subclass so REST handler returns envelope with code=ERR_UNAUTHORIZED
+        raise UnauthorizedError("Not authenticated")
     return user
 
 # CSRF cookie setter
