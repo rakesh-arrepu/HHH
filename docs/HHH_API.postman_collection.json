@@ -215,6 +215,140 @@
         },
         "description": "Returns backup statistics. Requires Super Admin role."
       }
+    },
+    {
+      "name": "Analytics – Group Analytics (GET, Member/Admin only)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/analytics/group/GROUP_ID?start_date=2025-01-01&end_date=2025-01-31",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "analytics", "group", "GROUP_ID"],
+          "query": [
+            { "key": "start_date", "value": "2025-01-01", "description": "Optional start date (YYYY-MM-DD)" },
+            { "key": "end_date", "value": "2025-01-31", "description": "Optional end date (YYYY-MM-DD)" }
+          ]
+        },
+        "description": "Returns analytics for a specific group. Requires group membership or admin role."
+      }
+    },
+    {
+      "name": "Analytics – Global Analytics (GET, Super Admin only)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/analytics/global?start_date=2025-01-01&end_date=2025-01-31",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "analytics", "global"],
+          "query": [
+            { "key": "start_date", "value": "2025-01-01", "description": "Optional start date (YYYY-MM-DD)" },
+            { "key": "end_date", "value": "2025-01-31", "description": "Optional end date (YYYY-MM-DD)" }
+          ]
+        },
+        "description": "Returns global system analytics. Requires Super Admin role."
+      }
+    },
+    {
+      "name": "Roles – Promote to Group Admin (POST, Group Admin only)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "name": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "name": "X-CSRF-Token", "value": "{{csrf_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"groupId\": \"GROUP_ID\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/roles/promote",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "roles", "promote"]
+        },
+        "description": "Promotes a user to group admin. Requires group admin permissions and CSRF token."
+      }
+    },
+    {
+      "name": "Roles – Demote from Group Admin (POST, Group Admin only)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "name": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "name": "X-CSRF-Token", "value": "{{csrf_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"USER_ID\",\n  \"groupId\": \"GROUP_ID\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/roles/demote",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "roles", "demote"]
+        },
+        "description": "Demotes a user from group admin to regular member. Requires group admin permissions and CSRF token."
+      }
+    },
+    {
+      "name": "Audit Logs – Get Logs (GET, Super Admin only)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/audit/logs?limit=50&offset=0&userId=USER_ID&action=login",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "audit", "logs"],
+          "query": [
+            { "key": "limit", "value": "50", "description": "Number of logs to return (max 100)" },
+            { "key": "offset", "value": "0", "description": "Pagination offset" },
+            { "key": "userId", "value": "USER_ID", "description": "Optional: Filter by user ID" },
+            { "key": "action", "value": "login", "description": "Optional: Filter by action type" },
+            { "key": "resourceType", "value": "auth", "description": "Optional: Filter by resource type" }
+          ]
+        },
+        "description": "Returns paginated audit logs with optional filtering. Requires Super Admin role."
+      }
+    },
+    {
+      "name": "GDPR – Export My Data (GraphQL Mutation)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "name": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "name": "X-CSRF-Token", "value": "{{csrf_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"mutation { exportMyData { success data message } }\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/graphql",
+          "host": ["{{base_url}}"],
+          "path": ["graphql"]
+        },
+        "description": "Exports user's complete data for GDPR compliance. Requires authentication and CSRF token."
+      }
+    },
+    {
+      "name": "GDPR – Delete My Account (GraphQL Mutation)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "name": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "name": "X-CSRF-Token", "value": "{{csrf_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"mutation { deleteMyAccount(confirm: true) { success message } }\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/graphql",
+          "host": ["{{base_url}}"],
+          "path": ["graphql"]
+        },
+        "description": "Soft deletes user's account with PII anonymization per GDPR. Requires explicit confirmation and CSRF token."
+      }
     }
   ]
 }

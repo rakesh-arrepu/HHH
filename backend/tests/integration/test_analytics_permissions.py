@@ -85,17 +85,17 @@ def _override_current_user(user_id: str, super_admin: bool = False):
         if super_admin:
             class DummyRole:
                 name = "SUPER_ADMIN"
-            class DummyUser:
+            class DummyUserSA:
                 def __init__(self, uid: str):
                     self.id = uid
                     self.role = DummyRole()
-            return DummyUser(user_id)
+            return DummyUserSA(user_id)
         else:
-            class DummyUser:
+            class DummyUserRegular:
                 def __init__(self, uid: str):
                     self.id = uid
                     self.role = None
-            return DummyUser(user_id)
+            return DummyUserRegular(user_id)
     main.app.dependency_overrides[core.security.get_current_user] = overridden_get_current_user
 
 
@@ -147,3 +147,23 @@ def test_global_analytics_requires_super_admin():
     data = resp_ok.json()
     # Verify required keys exist
     assert "total_users" in data and "total_groups" in data and "total_entries" in data
+
+
+def test_rest_analytics_unauthenticated():
+    """Test that REST analytics endpoints return 401 when no authentication."""
+    # Clear any overrides to simulate unauthenticated state
+    _clear_overrides()
+
+    # Test group analytics unauthenticated
+    group = _create_group()
+    resp_group = client.get(f"/api/v1/analytics/group/{group.id}")
+    assert resp_group.status_code == 401, resp_group.text
+
+    # Test global analytics unauthenticated
+    resp_global = client.get("/api/v1/analytics/global")
+    assert resp_global.status_code == 401, resp_global.text
+
+
+def _clear_overrides():
+    """Helper to clear dependency overrides."""
+    main.app.dependency_overrides.pop(core.security.get_current_user, None)

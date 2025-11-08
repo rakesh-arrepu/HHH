@@ -106,31 +106,59 @@ def export_user_data(db: Session, user_id: str) -> Dict[str, Any]:
 
 
 def delete_user_account(db: Session, user_id: str) -> str:
-    """Permanently delete user account and all associated data."""
+    """Soft delete user account and anonymize associated data per GDPR requirements."""
+    from datetime import datetime, timezone
+
     user = db.query(User).filter_by(id=user_id, deleted_at=None).first()
     if not user:
         raise ValueError("User not found")
 
-    # Count data before deletion for confirmation
-    entries_count = db.query(SectionEntry).filter_by(user_id=user_id).count()
-    memberships_count = db.query(GroupMember).filter_by(user_id=user_id).count()
-    notifications_count = db.query(Notification).filter_by(user_id=user_id).count()
+    now = datetime.now(timezone.utc)
+    deleted_count = 0
 
-    # Delete in proper order (respecting foreign keys)
-    # Delete entries
-    db.query(SectionEntry).filter_by(user_id=user_id).delete()
+    # Soft delete entries (anonymize content for privacy)
+    entries = db.query(SectionEntry).filter_by(user_id=user_id).all()
+    for entry in entries:
+        entry.content = "[DELETED]"  # Anonymize content
+        entry.deleted_at = now
+        deleted_count += 1
 
-    # Delete group memberships
-    db.query(GroupMember).filter_by(user_id=user_id).delete()
+    # Soft delete group memberships
+    memberships = db.query(GroupMember).filter_by(user_id=user_id).all()
+    for membership in memberships:
+        membership.deleted_at = now
+        deleted_count += 1
 
-    # Delete notifications
-    db.query(Notification).filter_by(user_id=user_id).delete()
+    # Soft delete notifications
+    notifications = db.query(Notification).filter_by(user_id=user_id).all()
+    for notification in notifications:
+        notification.deleted_at = now
+        deleted_count += 1
 
-    # Delete audit logs
-    db.query(AuditLog).filter_by(user_id=user_id).delete()
+    # For audit logs: retain for legal/compliance purposes but anonymize user data
+    # GDPR allows retention of audit logs for legitimate business/legal reasons
+    audit_logs = db.query(AuditLog).filter_by(user_id=user_id).all()
+    for log in audit_logs:
+        # Keep the log for compliance but anonymize PII
+        log.metadata = json.dumps({
+            "anonymized": True,
+            "original_user_id": user_id,
+            "deletion_timestamp": now.isoformat(),
+            "action": log.action,
+            "resource_type": log.resource_type
+        })
+        # Keep IP address anonymized if present
+        if log.ip_address:
+            log.ip_address = "ANONYMIZED"
 
-    # Finally delete the user
-    db.delete(user)
+    # Soft delete the user account (anonymize PII)
+    user.email = f"deleted-{user_id}@anonymous.local"
+    user.name = "[DELETED USER]"
+    user.password_hash = "DELETED"
+    user.totp_secret = None
+    user.is_2fa_enabled = False
+    user.deleted_at = now
+
     db.commit()
 
-    return f"Account permanently deleted. Removed {entries_count} entries, {memberships_count} group memberships, {notifications_count} notifications, and all audit logs."
+    return f"Account soft-deleted and anonymized per GDPR. Processed {deleted_count} records. User data anonymized, audit logs retained for compliance."

@@ -2801,3 +2801,8 @@ INFO:     Waiting for application startup.
 2025-10-27 20:49:46,213 INFO sqlalchemy.engine.Engine [raw sql] ()
 2025-10-27 20:49:46,213 INFO sqlalchemy.engine.Engine COMMIT
 INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [10284]
+INFO:     Stopping reloader process [60941]
