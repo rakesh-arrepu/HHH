@@ -45,10 +45,10 @@ def main():
         print(f"A user with role 'admin' already exists: {admin_user.email}")
     else:
         print("No super admin user found. Creating one now.")
-        email = input("Enter email for super admin: ")
+        email = "rakesh.arrepu@gmail.com"
         email_n = normalize_email(email)
-        name = input("Enter name for super admin: ").strip()
-        password = input("Enter password for super admin: ").strip()
+        name = "super_rocky"
+        password = "Super@123456"
         password_hash = get_password_hash(password)
         new_admin = User(
             email=email_n,
