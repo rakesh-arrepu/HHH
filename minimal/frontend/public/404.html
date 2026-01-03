@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecting…</title>
+    <meta name="robots" content="noindex" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; padding: 2rem; color: #374151; }
+    </style>
+    <script>
+      (function () {
+        // Preserve the original deep link so the SPA router can restore it.
+        var redirectPath = window.location.pathname + window.location.search + window.location.hash;
+        try {
+          sessionStorage.setItem('spa_redirect', redirectPath);
+        } catch (e) {
+          // ignore storage errors
+        }
+        // GitHub Pages user/organization site is served at domain root, so "/" is safe here.
+        // If switching to a repository site (username.github.io/repo), change newUrl to "/repo/".
+        var newUrl = "/";
+        window.location.replace(newUrl);
+      })();
+    </script>
+  </head>
+  <body>
+    <p>Redirecting…</p>
+  </body>
+</html>
