@@ -1,7 +1,8 @@
+from __future__ import annotations
 from datetime import datetime, date
 from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from .database import Base
+from database import Base
 
 
 class User(Base):
@@ -53,7 +54,7 @@ class Entry(Base):
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
     section: Mapped[str] = mapped_column(nullable=False)  # 'health', 'happiness', 'hela'
     content: Mapped[str] = mapped_column(nullable=False)
-    date: Mapped["date"] = mapped_column(nullable=False)
+    date: Mapped[date] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
