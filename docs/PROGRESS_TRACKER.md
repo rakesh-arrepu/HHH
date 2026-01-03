@@ -221,7 +221,7 @@ API Surface & Documentation
 Security, Rate Limiting, and Compliance
 - [ ] Rate limiting documentation and tests
   - [ ] Document 429 envelope and any relevant headers
-  - [ ] Provide env-based configuration examples (limits/windows)
+  - [ ] Provide env-based configuration examples
   - [ ] Add integration tests verifying 429 behavior
 - [ ] GDPR export/delete verification (see Backend & GraphQL)
 
@@ -265,3 +265,35 @@ Maintenance Notes
 - Update this tracker when completing items; keep bullets concise and actionable.
 - Prefer linking to PRs or commits in future updates for traceability.
 - When conflicts arise, prefer the most recent dated doc as primary source and reconcile here.
+
+## Minimal Folder Analysis (Based on code review on 03/01/2026)
+
+### Completed in Minimal
+
+- Basic user authentication (register, login, logout, get me) using session cookies
+- Group management: create group, list groups, list members, add member by email, remove member
+- Entry management: get entries for group and date, create or update entry for section (health, happiness, hela)
+- Analytics: streak calculation for group, history for last 30 days with completed sections
+- Frontend: Routing for dashboard, history, groups, login, register
+- Dashboard UI: Group selection, entry cards for sections, save entries, streak display, progress bar
+- History UI: Group selection, stats (complete/partial days, rate), 30-day calendar grid with color coding
+- API client in frontend for all endpoints
+- Database models for users, groups, group_members, entries
+- FastAPI app with CORS configuration
+
+### Pending in Minimal (inferred from code and missing features)
+
+- CSRF protection (configured but not implemented in code)
+- 2FA (mentioned in comment but not implemented)
+- Error standardization and envelopes
+- RBAC and roles
+- Admin interfaces
+- Notifications
+- Global analytics
+- GDPR features (export/delete data)
+- Backups
+- Rate limiting
+- Testing (no tests in minimal)
+- GraphQL (using REST)
+- Production configurations (secure cookies, etc., partially there)
+- And other advanced features from main project
