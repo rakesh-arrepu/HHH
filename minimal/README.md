@@ -45,6 +45,8 @@ Open http://localhost:5173 in your browser.
 | POST | /api/auth/login | Login |
 | POST | /api/auth/logout | Logout |
 | GET | /api/auth/me | Get current user |
+| POST | /api/auth/password/forgot | Request password reset (dev returns token) |
+| POST | /api/auth/password/reset | Reset password with token |
 | GET | /api/groups | List groups |
 | POST | /api/groups | Create group |
 | GET | /api/groups/:id/members | List members |
@@ -54,6 +56,25 @@ Open http://localhost:5173 in your browser.
 | POST | /api/entries | Create/update entry |
 | GET | /api/analytics/streak | Get streak |
 | GET | /api/analytics/history | Get history |
+
+## Password Reset Flow (Dev)
+
+In development, the password reset flow is available without email delivery:
+1) Forgot Password
+   - Go to /forgot-password
+   - Enter your account email
+   - The backend issues a time-limited token (15 min) and returns it in the response as reset_token
+2) Reset Password
+   - Click "Continue to Reset Password" or open /reset-password?token=... directly
+   - Enter a new password (min 6 chars) and submit
+   - On success, your stored password hash is overwritten in the database
+
+Notes:
+- Tokens are signed with SECRET_KEY (set it in your environment for security)
+- In production, the token should be emailed to the user instead of returned in the API response
+- Endpoints:
+  - POST /api/auth/password/forgot  { email }
+  - POST /api/auth/password/reset   { token, password }
 
 ## Production Deployment
 

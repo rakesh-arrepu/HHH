@@ -42,6 +42,18 @@ export const api = {
 
   getMe: () => request<{ id: number; email: string; name: string }>('/auth/me'),
 
+  forgotPassword: (email: string) =>
+    request<{ message: string; reset_token?: string }>('/auth/password/forgot', {
+      method: 'POST',
+      body: { email },
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    request<{ message: string }>('/auth/password/reset', {
+      method: 'POST',
+      body: { token, password },
+    }),
+
   // Groups
   getGroups: () =>
     request<{ id: number; name: string; owner_id: number; is_owner: boolean }[]>('/groups'),

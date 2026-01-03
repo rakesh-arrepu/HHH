@@ -10,7 +10,7 @@ from sqlalchemy import func
 
 from database import engine, get_db, Base
 from models import User, Group, GroupMember, Entry # type: ignore
-from auth import hash_password, verify_password, create_session_token, verify_session_token
+from auth import hash_password, verify_password, create_session_token, verify_session_token, create_password_reset_token, verify_password_reset_token
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -51,6 +51,13 @@ class UserCreate(BaseModel):
 
 class UserLogin(BaseModel):
     email: EmailStr
+    password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
     password: str
 
 class UserResponse(BaseModel):
@@ -176,6 +183,41 @@ def logout(response: Response):
 @app.get("/api/auth/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return UserResponse(id=cast(int, current_user.id), email=cast(str, current_user.email), name=cast(str, current_user.name))
+
+# ============== Password Reset Endpoints ==============
+
+@app.post("/api/auth/password/forgot")
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Issue a time-limited password reset token for a given email.
+    Always return a generic success message. For local/dev, also return the token.
+    """
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user:
+        # Do not reveal whether the email exists
+        return {"message": "If account exists, a reset link was sent."}
+    token = create_password_reset_token(payload.email)
+    # In production you would email this token. For dev, return it for convenience.
+    return {"message": "If account exists, a reset link was sent.", "reset_token": token}
+
+@app.post("/api/auth/password/reset")
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Reset password using a valid reset token. Overwrites the user's password hash.
+    """
+    email = verify_password_reset_token(payload.token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password_hash = hash_password(payload.password)  # type: ignore[assignment]
+    db.add(user)
+    db.commit()
+
+    return {"message": "Password has been reset successfully."}
 
 # ============== Group Endpoints ==============
 

@@ -27,3 +27,18 @@ def verify_session_token(token: str) -> int | None:
         return data.get("user_id")
     except (BadSignature, SignatureExpired):
         return None
+
+# Password reset tokens (time-limited)
+RESET_TOKEN_MAX_AGE = 60 * 15  # 15 minutes
+
+def create_password_reset_token(email: str) -> str:
+    return serializer.dumps({"email": email, "type": "password_reset"})
+
+def verify_password_reset_token(token: str) -> str | None:
+    try:
+        data = serializer.loads(token, max_age=RESET_TOKEN_MAX_AGE)
+        if data.get("type") != "password_reset":
+            return None
+        return data.get("email")
+    except (BadSignature, SignatureExpired):
+        return None
