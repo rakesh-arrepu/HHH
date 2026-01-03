@@ -8,9 +8,9 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from .database import engine, get_db, Base
-from .models import User, Group, GroupMember, Entry
-from .auth import hash_password, verify_password, create_session_token, verify_session_token
+from database import engine, get_db, Base
+from models import User, Group, GroupMember, Entry
+from auth import hash_password, verify_password, create_session_token, verify_session_token
 
 # Create tables
 Base.metadata.create_all(bind=engine)
