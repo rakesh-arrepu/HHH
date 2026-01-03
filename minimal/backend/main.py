@@ -555,6 +555,11 @@ def get_history(
 
     return sorted(result, key=lambda x: x.date, reverse=True)
 
+# ============== Root ==============
+@app.get("/", include_in_schema=False)
+def root():
+    return {"ok": True, "service": "Daily Tracker API", "docs": "/docs", "health": "/api/health"}
+
 # ============== Health Check ==============
 
 @app.get("/api/health")
