@@ -1,9 +1,27 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Daily Tracker</title>
+    <script>
+      (function () {
+        // If 404.html redirected us here, restore the original deep link before React mounts.
+        try {
+          var path = sessionStorage.getItem('spa_redirect');
+          if (path && typeof path === 'string') {
+            sessionStorage.removeItem('spa_redirect');
+            var current = location.pathname + location.search + location.hash;
+            if (path !== current) {
+              history.replaceState(null, '', path);
+            }
+          }
+        } catch (e) {
+          // ignore storage errors
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,8 +1,0 @@
-Short (50 chars or less) summary of changes
-
-More detailed explanatory text, if necessary. Wrap at 72 characters.
-
-- What changed and why
-- Any follow-ups or migration steps
-
-Refs: #<issue-number>

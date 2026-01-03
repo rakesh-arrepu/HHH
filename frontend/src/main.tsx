@@ -1,16 +1,16 @@
 import React from 'react'
-import { createRoot } from 'react-dom/client'
-import { ApolloProvider } from '@apollo/client/react'
+import ReactDOM from 'react-dom/client'
+import { HashRouter } from 'react-router-dom'
 import App from './App'
-import { client } from './lib/apollo'
+import { AuthProvider } from './auth'
 import './index.css'
 
-const rootEl = document.getElementById('root')
-if (!rootEl) {
-  throw new Error('Root element not found')
-}
-createRoot(rootEl).render(
-  <ApolloProvider client={client}>
-    <App />
-  </ApolloProvider>
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <HashRouter>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </HashRouter>
+  </React.StrictMode>
 )

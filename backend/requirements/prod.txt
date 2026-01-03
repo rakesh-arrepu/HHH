@@ -1,3 +1,0 @@
--r base.txt
-psycopg[binary]
-alembic==1.12.1

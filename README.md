@@ -1,40 +1,90 @@
-# daily-tracker
+# Daily Tracker (Minimal)
 
-Monorepo skeleton for the Daily Tracker app.
+A simple daily tracker for Health, Happiness, and Hela (Money).
 
-## Getting started
+## Quick Start
 
-Quick commands to run the project locally.
-
-Backend (venv):
+### Backend
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r backend/requirements/base.txt
-uvicorn backend.main:app --reload --port 8000
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
 ```
 
-Frontend:
+### Frontend
 
 ```bash
 cd frontend
-npm ci
+npm install
 npm run dev
 ```
 
-Start both with Docker Compose (dev):
+Open http://localhost:5173 in your browser.
 
-```bash
-make dev
-```
+## Features
 
-Install pre-commit hooks:
+- **Daily Entries**: Track 3 sections (Health, Happiness, Hela) each day
+- **Groups**: Create groups and invite members to track together
+- **Streak Counter**: Counts consecutive days with all 3 sections completed
+- **History**: View past 30 days with completion calendar
 
-```bash
-pip install pre-commit
-pre-commit install
-```
+## Tech Stack
 
-Commit message template is configured in `.gitmessage.txt`.
+- **Backend**: FastAPI + SQLite + SQLAlchemy
+- **Frontend**: React 18 + Vite + Tailwind CSS v4
+- **Auth**: Session cookies (simple, secure)
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/auth/register | Create account |
+| POST | /api/auth/login | Login |
+| POST | /api/auth/logout | Logout |
+| GET | /api/auth/me | Get current user |
+| POST | /api/auth/password/forgot | Request password reset (dev returns token) |
+| POST | /api/auth/password/reset | Reset password with token |
+| GET | /api/groups | List groups |
+| POST | /api/groups | Create group |
+| GET | /api/groups/:id/members | List members |
+| POST | /api/groups/:id/members | Add member |
+| DELETE | /api/groups/:id/members/:uid | Remove member |
+| GET | /api/entries | Get entries |
+| POST | /api/entries | Create/update entry |
+| GET | /api/analytics/streak | Get streak |
+| GET | /api/analytics/history | Get history |
+
+## Password Reset Flow (Dev)
+
+In development, the password reset flow is available without email delivery:
+1) Forgot Password
+   - Go to /forgot-password
+   - Enter your account email
+   - The backend issues a time-limited token (15 min) and returns it in the response as reset_token
+2) Reset Password
+   - Click "Continue to Reset Password" or open /reset-password?token=... directly
+   - Enter a new password (min 6 chars) and submit
+   - On success, your stored password hash is overwritten in the database
+
+Notes:
+- Tokens are signed with SECRET_KEY (set it in your environment for security)
+- In production, the token should be emailed to the user instead of returned in the API response
+- Endpoints:
+  - POST /api/auth/password/forgot  { email }
+  - POST /api/auth/password/reset   { token, password }
+
+## Production Deployment
+
+The app is deployed to production with the following setup:
+- **Frontend**: Hosted on GitHub Pages at https://rakesh-arrepu.github.io/HHH/
+- **Backend**: Hosted on Render at https://hhh-backend.onrender.com
+- **Database**: Neon Postgres
+
+To access the live application, visit the frontend URL. For updates:
+- Push changes to the main branch to trigger deployment via GitHub Actions.
+- Monitor workflows in the Actions tab of the repository.
+
+Note: Ensure CORS settings (ALLOWED_ORIGINS) in the backend include the frontend URL. Update in Render if needed.

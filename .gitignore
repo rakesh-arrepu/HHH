@@ -2,30 +2,29 @@
 __pycache__/
 *.py[cod]
 *.so
+venv/
+backend/venv/
+
+# Node
+node_modules/
+dist/
+frontend/dist/
+
+# Environment
+.env
+backend/.env
+
+# Database
+*.db
+backend/*.db
 
 # macOS
 .DS_Store
 
-# Local env files
-.env
-backend/.env
+# IDE
+.vscode/
+.idea/
 
-# SQLite DB (development)
-backend/app.db
-app.db
-# Python
-__pycache__/
-*.pyc
-.env
-
-# Node
-node_modules/
-/dist
-frontend/dist/
-
-# Local debug/test artifacts
-cookies.txt
-csrf_cookies.txt
-headers.txt
-gql_localhost.json
-graphql_health.json
+# Logs
+*.log
+*.pid
