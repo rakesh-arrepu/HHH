@@ -1,4 +1,22 @@
-const API_ROOT = (import.meta.env.VITE_API_URL ?? '').toString().trim()
+/**
+ * Determine API root:
+ * - Prefer VITE_API_URL when provided at build time
+ * - If hosted on GitHub Pages and VITE_API_URL is not set, default to Render backend
+ * - In local dev (no VITE_API_URL and not on GitHub Pages), fallback to '/api' (Vite proxy/dev)
+ */
+function inferDefaultApi(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host.endsWith('github.io')) {
+      return 'https://hhh-backend.onrender.com'
+    }
+  }
+  return ''
+}
+
+const explicitRoot = (import.meta.env.VITE_API_URL ?? '').toString().trim()
+const inferredRoot = inferDefaultApi()
+const API_ROOT = explicitRoot || inferredRoot
 const API_BASE = API_ROOT ? `${API_ROOT.replace(/\/$/, '')}/api` : '/api'
 
 type RequestOptions = {

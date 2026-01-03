@@ -23,7 +23,8 @@ ALLOWED_ORIGINS = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
 
 is_production = os.getenv("RENDER", "").lower() == "true"
 
-if is_production:
+# Always include GitHub Pages origin for hosted SPA
+if "https://rakesh-arrepu.github.io" not in ALLOWED_ORIGINS:
     ALLOWED_ORIGINS.append("https://rakesh-arrepu.github.io")
 
 # Choose secure cookie defaults based on environment, then allow env overrides.
@@ -37,6 +38,12 @@ if _cookie_samesite_raw in ('lax','strict','none'):
     COOKIE_SAMESITE = cast(Literal['lax','strict','none'], _cookie_samesite_raw)
 
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", _default_secure).lower() == "true"
+
+# Force cross-site cookie attributes when frontend is hosted on a different origin (e.g., GitHub Pages)
+# This ensures browser will send cookies on XHR/fetch with credentials across origins.
+if any(("github.io" in o) for o in ALLOWED_ORIGINS):
+    COOKIE_SAMESITE = cast(Literal['lax','strict','none'], 'none')
+    COOKIE_SECURE = True
 
 app.add_middleware(
     CORSMiddleware,
@@ -181,7 +188,7 @@ def login(user_data: UserLogin, response: Response, db: Session = Depends(get_db
 
 @app.post("/api/auth/logout")
 def logout(response: Response):
-    response.delete_cookie(key="session")
+    response.delete_cookie(key="session", samesite=COOKIE_SAMESITE, secure=COOKIE_SECURE)
     return {"message": "Logged out"}
 
 @app.get("/api/auth/me", response_model=UserResponse)
