@@ -1,7 +1,7 @@
 # Application configuration using environment variables.
 # Uses Pydantic BaseSettings to allow overrides via .env and real env vars.
-from pydantic_settings import BaseSettings
-from typing import List
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -32,14 +32,15 @@ class Settings(BaseSettings):
     # Cookies/CSRF
     csrf_cookie_name: str = "hhh_csrf"
     csrf_header_name: str = "X-CSRF-Token"
-    cookie_domain: str = "localhost"
+    cookie_domain: Optional[str] = "localhost"
     secure_cookies: bool = False
     access_cookie_name: str = "hhh_at"
     refresh_cookie_name: str = "hhh_rt"
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False
+    )
 
 
 settings = Settings()
