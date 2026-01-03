@@ -19,7 +19,9 @@
         }
         // GitHub Pages user/organization site is served at domain root, so "/" is safe here.
         // If switching to a repository site (username.github.io/repo), change newUrl to "/repo/".
-        var newUrl = "/";
+        // Redirect to hash-based route so SPA can handle deep links on GitHub Pages
+        var hashPath = redirectPath.replace(/^\//, '');
+        var newUrl = "/#/" + hashPath.replace(/^#\/?/, '');
         window.location.replace(newUrl);
       })();
     </script>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import { Link } from 'react-router-dom'
 
 type Group = { id: number; name: string; is_owner: boolean }
 
@@ -95,12 +96,12 @@ export default function Dashboard() {
       <div className="text-center py-12">
         <h2 className="text-xl font-semibold text-gray-700 mb-4">No Groups Yet</h2>
         <p className="text-gray-500 mb-4">Create a group to start tracking your daily entries.</p>
-        <a
-          href="/groups"
+        <Link
+          to="/groups"
           className="inline-block px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
         >
           Create Group
-        </a>
+        </Link>
       </div>
     )
   }
