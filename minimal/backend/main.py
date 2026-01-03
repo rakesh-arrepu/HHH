@@ -21,18 +21,22 @@ app = FastAPI(title="Daily Tracker API")
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174")
 ALLOWED_ORIGINS = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
 
-is_production = os.getenv("RENDER") == "true"
+is_production = os.getenv("RENDER", "").lower() == "true"
 
 if is_production:
     ALLOWED_ORIGINS.append("https://rakesh-arrepu.github.io")
-    COOKIE_SECURE = True
-    COOKIE_SAMESITE = "none"
 
-_cookie_samesite_raw = os.getenv("COOKIE_SAMESITE", "lax").lower()
-COOKIE_SAMESITE: Literal['lax','strict','none'] = 'lax'
+# Choose secure cookie defaults based on environment, then allow env overrides.
+# In production we must use SameSite=None and Secure=true for cross-site (github.io → onrender.com).
+_default_samesite = "none" if is_production else "lax"
+_default_secure = "true" if is_production else "false"
+
+_cookie_samesite_raw = os.getenv("COOKIE_SAMESITE", _default_samesite).lower()
+COOKIE_SAMESITE: Literal['lax','strict','none'] = cast(Literal['lax','strict','none'], _default_samesite)
 if _cookie_samesite_raw in ('lax','strict','none'):
     COOKIE_SAMESITE = cast(Literal['lax','strict','none'], _cookie_samesite_raw)
-COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", _default_secure).lower() == "true"
 
 app.add_middleware(
     CORSMiddleware,
