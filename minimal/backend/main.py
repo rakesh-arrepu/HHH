@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from database import engine, get_db, Base
-from models import User, Group, GroupMember, Entry
+from models import User, Group, GroupMember, Entry # type: ignore
 from auth import hash_password, verify_password, create_session_token, verify_session_token
 
 # Create tables
@@ -20,6 +20,14 @@ app = FastAPI(title="Daily Tracker API")
 # CORS for frontend
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174")
 ALLOWED_ORIGINS = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
+
+is_production = os.getenv("RENDER") == "true"
+
+if is_production:
+    ALLOWED_ORIGINS.append("https://rakesh-arrepu.github.io")
+    COOKIE_SECURE = True
+    COOKIE_SAMESITE = "none"
+
 _cookie_samesite_raw = os.getenv("COOKIE_SAMESITE", "lax").lower()
 COOKIE_SAMESITE: Literal['lax','strict','none'] = 'lax'
 if _cookie_samesite_raw in ('lax','strict','none'):

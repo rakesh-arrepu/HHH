@@ -43,3 +43,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+if settings.environment.lower() == "production":
+    settings.cors_allow_origins.append("https://rakesh-arrepu.github.io")
+    settings.secure_cookies = True
+    settings.cookie_domain = None

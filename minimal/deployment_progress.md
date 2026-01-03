@@ -125,31 +125,35 @@ Based on GitHub Docs (/github/docs), here's a refined step-by-step guide to set 
 
 2. Go to your GitHub repository settings: https://github.com/rakesh-arrepu/HHH/settings/pages.
 
-3. Under "Build and deployment", select "Source: Deploy from a branch".
+3. Under "Build and deployment", select "Source: GitHub Actions" (important for Actions-based deployments).
 
-4. Choose the branch: Select "gh-pages" (this branch will be created by the deployment workflow). For the folder, select "/ (root)".
+4. Save the changes. This enables GitHub Pages to use workflows for deployment (no need for a specific branch like gh-pages; the workflow handles it).
 
-5. Save the changes. This enables GitHub Pages for the repository.
-
-6. Configure environment variables for the build:
+5. Configure environment variables for the build:
    - Go to "Actions" > "General" and ensure workflows are enabled.
-   - Under "Secrets and variables" > "Actions" > "Variables", add:
+   - Under "Secrets and variables" > "Actions" > "Variables", confirm or add:
      - Name: API_BASE_URL
      - Value: https://hhh-backend.onrender.com
-     - (Optional) VITE_BASE_PATH: /HHH/ (for correct asset paths)
+     - Name: VITE_BASE_PATH
+     - Value: /HHH/ (for correct asset paths in subfolder deployment)
 
-7. Trigger the deployment:
-   - Push a small change to the main branch (e.g., edit README.md).
-   - Or, go to the Actions tab, select the "Deploy Frontend to GitHub Pages" workflow, and run it manually.
+6. Trigger the deployment:
+   - Push a small change to the main branch (e.g., edit README.md and commit/push).
+   - Or, go to the Actions tab, select the "Deploy Frontend to GitHub Pages" workflow, and run it manually for the main branch.
 
-8. Monitor the workflow: In the Actions tab, watch the workflow run. It builds the frontend and deploys to gh-pages branch.
+7. Monitor the workflow: In the Actions tab, watch the workflow run. It should build the frontend (npm run build) and deploy the dist folder using actions/deploy-pages.
 
-9. Access the site: Once deployed, the URL is https://rakesh-arrepu.github.io/HHH/. It may take a few minutes to go live.
+8. Access the site: Once the workflow succeeds, the URL is https://rakesh-arrepu.github.io/HHH/. It may take a few minutes to propagate. Refresh and check.
 
-10. CORS Update: In Render dashboard, update ALLOWED_ORIGINS to include https://rakesh-arrepu.github.io and redeploy the backend.
+9. CORS Update: In Render dashboard for the backend service, update ALLOWED_ORIGINS to include "https://rakesh-arrepu.github.io" (add to the comma-separated list) and manually redeploy.
 
-11. If issues: Check workflow logs for errors. Ensure the gh-pages branch is created and contains the built files.
+10. Troubleshooting:
+   - If the page shows repository code or instructions instead of the app (as in your screenshot), this happens when Source is set to "Deploy from a branch" instead of "GitHub Actions". Change it to "GitHub Actions" in Pages settings and re-trigger the workflow.
+   - Check workflow logs for errors (e.g., build failures) in the Actions tab.
+   - Verify the published site in Pages settings shows a successful deployment and the correct URL.
+   - Ensure VITE_BASE_PATH is set to /HHH/ in Actions variables for correct routing.
+   - If still issues, share a screenshot of Pages settings, Actions variables, and recent workflow logs.
 
-After deployment, provide the frontend URL and confirm if it's accessible. If you encounter problems, share details for troubleshooting.
+After fixing and confirming the app is live and functional (shows the login/register page), let me know the frontend URL and if there are any remaining errors.
 
 Updates will be made to this document as progress is achieved.
