@@ -1,23 +1,47 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './auth'
+import { motion } from 'framer-motion'
+import { Sparkles } from 'lucide-react'
 import Header from './components/Header'
-import Dashboard from './pages/Dashboard'
+import Journal from './pages/Journal'
 import History from './pages/History'
 import Groups from './pages/Groups'
+import Analytics from './pages/Analytics'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center">
+      <motion.div
+        initial={{ scale: 0, rotate: -180 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', bounce: 0.5 }}
+        className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 flex items-center justify-center shadow-2xl mb-6"
+        style={{ boxShadow: '0 0 60px rgba(139, 92, 246, 0.4)' }}
+      >
+        <Sparkles className="w-10 h-10 text-white" />
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="text-center"
+      >
+        <div className="spinner mx-auto mb-4" />
+        <p className="text-white/60 text-sm">Loading your journey...</p>
+      </motion.div>
+    </div>
+  )
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   if (!user) {
@@ -31,27 +55,23 @@ export default function App() {
   const { user, loading } = useAuth()
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   return (
     <div className="min-h-screen">
       {user && <Header />}
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className={user ? 'pb-8' : ''}>
         <Routes>
           <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
           <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
           <Route path="/forgot-password" element={user ? <Navigate to="/" replace /> : <ForgotPassword />} />
-          <Route path="/reset-password" element={user ? <Navigate to="/" replace /> : <ResetPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route
             path="/"
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <Journal />
               </ProtectedRoute>
             }
           />
@@ -68,6 +88,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Groups />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Analytics />
               </ProtectedRoute>
             }
           />

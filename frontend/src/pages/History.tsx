@@ -1,5 +1,24 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import { motion } from 'framer-motion'
+import {
+  CalendarDays,
+  TrendingUp,
+  Percent,
+  Users,
+  Heart,
+  Smile,
+  Coins,
+  Check,
+  Minus
+} from 'lucide-react'
+import {
+  GlassCard,
+  SelectField,
+  PageContainer,
+  PageTitle,
+  EmptyState
+} from '../components/ui'
 
 type Group = { id: number; name: string }
 type HistoryDay = { date: string; completed_sections: string[]; is_complete: boolean }
@@ -9,6 +28,7 @@ export default function History() {
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null)
   const [history, setHistory] = useState<HistoryDay[]>([])
   const [loading, setLoading] = useState(true)
+  const [hoveredDay, setHoveredDay] = useState<HistoryDay | null>(null)
 
   useEffect(() => {
     loadGroups()
@@ -45,115 +65,292 @@ export default function History() {
   }
 
   if (loading) {
-    return <div className="text-center text-gray-500">Loading...</div>
+    return (
+      <PageContainer className="flex items-center justify-center min-h-[60vh]">
+        <div className="spinner" />
+      </PageContainer>
+    )
   }
 
   if (groups.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">No groups found. Create a group first.</p>
-      </div>
+      <PageContainer>
+        <EmptyState
+          icon={CalendarDays}
+          title="No Groups Found"
+          description="Create a group first to start tracking your history"
+        />
+      </PageContainer>
     )
   }
 
   // Calculate stats
   const completeDays = history.filter((d) => d.is_complete).length
-  const partialDays = history.filter((d) => d.completed_sections.length > 0 && !d.is_complete).length
+  const partialDays = history.filter(
+    (d) => d.completed_sections.length > 0 && !d.is_complete
+  ).length
+  const completionRate = Math.round((completeDays / 30) * 100)
+
+  const stats = [
+    {
+      label: 'Complete Days',
+      value: completeDays,
+      icon: Check,
+      gradient: 'from-emerald-500 to-teal-500',
+      glow: 'shadow-emerald-500/30',
+    },
+    {
+      label: 'Partial Days',
+      value: partialDays,
+      icon: Minus,
+      gradient: 'from-amber-500 to-orange-500',
+      glow: 'shadow-amber-500/30',
+    },
+    {
+      label: 'Completion Rate',
+      value: `${completionRate}%`,
+      icon: Percent,
+      gradient: 'from-purple-500 to-pink-500',
+      glow: 'shadow-purple-500/30',
+    },
+  ]
+
+  const groupOptions = groups.map((g) => ({ value: g.id, label: g.name }))
+
+  const getSectionIcon = (section: string) => {
+    switch (section) {
+      case 'health':
+        return Heart
+      case 'happiness':
+        return Smile
+      case 'hela':
+        return Coins
+      default:
+        return Check
+    }
+  }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">History</h1>
-        <select
-          value={selectedGroup || ''}
-          onChange={(e) => setSelectedGroup(Number(e.target.value))}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white p-4 rounded-lg border text-center">
-          <div className="text-3xl font-bold text-green-600">{completeDays}</div>
-          <div className="text-sm text-gray-500">Complete Days</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border text-center">
-          <div className="text-3xl font-bold text-yellow-600">{partialDays}</div>
-          <div className="text-sm text-gray-500">Partial Days</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border text-center">
-          <div className="text-3xl font-bold text-indigo-600">
-            {Math.round((completeDays / 30) * 100)}%
-          </div>
-          <div className="text-sm text-gray-500">Completion Rate</div>
+    <PageContainer>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <PageTitle
+          title="History"
+          subtitle="Your 30-day tracking journey"
+          icon={CalendarDays}
+        />
+        <div className="w-full sm:w-48">
+          <SelectField
+            options={groupOptions}
+            value={selectedGroup || ''}
+            onChange={(e) => setSelectedGroup(Number(e.target.value))}
+            icon={Users}
+          />
         </div>
       </div>
 
-      {/* Calendar grid */}
-      <div className="bg-white rounded-lg border p-6">
-        <h2 className="text-lg font-semibold mb-4">Last 30 Days</h2>
-        <div className="grid grid-cols-7 gap-2">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={day} className="text-center text-xs text-gray-500 font-medium py-2">
-              {day}
-            </div>
-          ))}
-
-          {/* Add empty cells for alignment */}
-          {history.length > 0 &&
-            Array.from({ length: new Date(history[history.length - 1].date).getDay() }).map(
-              (_, i) => <div key={`empty-${i}`} />
-            )}
-
-          {[...history].reverse().map((day) => {
-            const date = new Date(day.date)
-            const isToday = day.date === new Date().toISOString().split('T')[0]
-
-            let bgColor = 'bg-gray-100'
-            if (day.is_complete) {
-              bgColor = 'bg-green-500'
-            } else if (day.completed_sections.length === 2) {
-              bgColor = 'bg-yellow-400'
-            } else if (day.completed_sections.length === 1) {
-              bgColor = 'bg-yellow-200'
-            }
-
-            return (
-              <div
-                key={day.date}
-                className={`aspect-square rounded-md flex items-center justify-center text-sm ${bgColor} ${
-                  isToday ? 'ring-2 ring-indigo-500' : ''
-                } ${day.is_complete ? 'text-white' : 'text-gray-700'}`}
-                title={`${day.date}: ${day.completed_sections.join(', ') || 'No entries'}`}
-              >
-                {date.getDate()}
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {stats.map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+          >
+            <GlassCard className="relative overflow-hidden">
+              <div className="flex items-center gap-4">
+                <div
+                  className={`w-14 h-14 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg ${stat.glow}`}
+                >
+                  <stat.icon className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <p className="text-white/50 text-sm">{stat.label}</p>
+                  <p className="text-3xl font-bold text-white">{stat.value}</p>
+                </div>
               </div>
-            )
-          })}
-        </div>
-
-        {/* Legend */}
-        <div className="flex justify-center gap-6 mt-6 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-green-500" />
-            <span className="text-gray-600">Complete (3/3)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-yellow-400" />
-            <span className="text-gray-600">Partial</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-gray-100" />
-            <span className="text-gray-600">No entries</span>
-          </div>
-        </div>
+              {/* Background decoration */}
+              <div
+                className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full bg-gradient-to-br ${stat.gradient} opacity-10 blur-xl`}
+              />
+            </GlassCard>
+          </motion.div>
+        ))}
       </div>
-    </div>
+
+      {/* Calendar Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <GlassCard>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-purple-400" />
+              Last 30 Days
+            </h2>
+            {hoveredDay && (
+              <motion.div
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="text-sm text-white/60"
+              >
+                {new Date(hoveredDay.date + 'T00:00:00').toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}{' '}
+                - {hoveredDay.completed_sections.length}/3 sections
+              </motion.div>
+            )}
+          </div>
+
+          {/* Calendar Grid - Properly Centered */}
+          <div className="flex justify-center">
+            <div className="inline-block">
+              {/* Day Headers */}
+              <div className="grid grid-cols-7 gap-2 mb-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                  <div
+                    key={day}
+                    className="w-11 h-8 sm:w-14 sm:h-10 flex items-center justify-center text-xs sm:text-sm text-white/50 font-medium"
+                  >
+                    {day.substring(0, 2)}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Days */}
+              <div className="grid grid-cols-7 gap-2">
+                {/* Empty cells for alignment - based on first day of oldest date */}
+                {history.length > 0 &&
+                  Array.from({
+                    length: new Date(history[history.length - 1].date + 'T00:00:00').getDay(),
+                  }).map((_, i) => (
+                    <div key={`empty-${i}`} className="w-11 h-11 sm:w-14 sm:h-14" />
+                  ))}
+
+                {/* Day cells */}
+                {[...history].reverse().map((day, index) => {
+                  const date = new Date(day.date + 'T00:00:00')
+                  const isToday = day.date === new Date().toISOString().split('T')[0]
+                  const sectionCount = day.completed_sections.length
+
+                  return (
+                    <motion.div
+                      key={day.date}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.3 + index * 0.01 }}
+                      onMouseEnter={() => setHoveredDay(day)}
+                      onMouseLeave={() => setHoveredDay(null)}
+                      onClick={() => setHoveredDay(hoveredDay?.date === day.date ? null : day)}
+                      className={`
+                        w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
+                        ${
+                          day.is_complete
+                            ? 'bg-gradient-to-br from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30'
+                            : sectionCount === 2
+                            ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-lg shadow-amber-500/20'
+                            : sectionCount === 1
+                            ? 'bg-gradient-to-br from-amber-500/50 to-orange-500/50'
+                            : 'bg-white/5 hover:bg-white/10'
+                        }
+                        ${isToday ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-[#0f0f1a]' : ''}
+                      `}
+                    >
+                      {/* Date number */}
+                      <span
+                        className={`text-sm sm:text-base font-bold ${
+                          sectionCount > 0 ? 'text-white' : 'text-white/50'
+                        }`}
+                      >
+                        {date.getDate()}
+                      </span>
+
+                      {/* Section count */}
+                      <span
+                        className={`text-[10px] sm:text-xs font-semibold ${
+                          sectionCount === 3
+                            ? 'text-emerald-100'
+                            : sectionCount === 2
+                            ? 'text-amber-100'
+                            : sectionCount === 1
+                            ? 'text-amber-200/80'
+                            : 'text-white/30'
+                        }`}
+                      >
+                        {sectionCount}/3
+                      </span>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-8 mt-8 pt-6 border-t border-white/10">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-md bg-gradient-to-br from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30" />
+              <span className="text-white/60 text-sm">Complete (3/3)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-md bg-gradient-to-br from-amber-500 to-orange-500" />
+              <span className="text-white/60 text-sm">Almost (2/3)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-md bg-gradient-to-br from-amber-500/50 to-orange-500/50" />
+              <span className="text-white/60 text-sm">Started (1/3)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-md bg-white/10" />
+              <span className="text-white/60 text-sm">Empty</span>
+            </div>
+          </div>
+
+          {/* Selected/Hovered day details */}
+          {hoveredDay && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10"
+            >
+              <p className="text-white font-medium mb-2">
+                {new Date(hoveredDay.date + 'T00:00:00').toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </p>
+              {hoveredDay.completed_sections.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {hoveredDay.completed_sections.map((section) => {
+                    const Icon = getSectionIcon(section)
+                    return (
+                      <div
+                        key={section}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                          section === 'health'
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : section === 'happiness'
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-yellow-500/20 text-yellow-400'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="text-sm capitalize font-medium">{section}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-white/40 text-sm">No entries for this day</p>
+              )}
+            </motion.div>
+          )}
+        </GlassCard>
+      </motion.div>
+    </PageContainer>
   )
 }

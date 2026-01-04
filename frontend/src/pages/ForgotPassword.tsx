@@ -1,11 +1,23 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { motion } from 'framer-motion'
+import {
+  Mail,
+  KeyRound,
+  ArrowLeft,
+  Send,
+  AlertTriangle,
+  Inbox,
+  RefreshCw
+} from 'lucide-react'
+import { GlassCard, GlowButton, InputField } from '../components/ui'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
-  const [info, setInfo] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
   const [devToken, setDevToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -13,20 +25,27 @@ export default function ForgotPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setInfo(null)
+    setSuccess(false)
+    setEmailSent(false)
     setDevToken(null)
     setLoading(true)
 
     try {
       const res = await api.forgotPassword(email)
-      setInfo('If an account exists for this email, a reset link has been sent.')
-      // For local/dev, backend returns reset_token for convenience
+      setSuccess(true)
+
+      // Check if email was actually sent
+      if (res.email_sent) {
+        setEmailSent(true)
+      }
+
+      // Dev mode fallback: show token if email not configured
       if (res.reset_token) {
         setDevToken(res.reset_token)
       }
-    } catch (err) {
-      // Still show generic success to avoid user enumeration
-      setInfo('If an account exists for this email, a reset link has been sent.')
+    } catch {
+      // Still show success to avoid user enumeration
+      setSuccess(true)
     } finally {
       setLoading(false)
     }
@@ -38,67 +57,173 @@ export default function ForgotPassword() {
     }
   }
 
-  return (
-    <div className="max-w-md mx-auto mt-16">
-      <h1 className="text-2xl font-bold text-center mb-8">Forgot Password</h1>
+  const handleTryAgain = () => {
+    setSuccess(false)
+    setEmailSent(false)
+    setDevToken(null)
+    setError('')
+  }
 
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-sm border">
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
-            {error}
-          </div>
-        )}
-        {info && (
-          <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-md text-sm">
-            {info}
-          </div>
-        )}
+  // Success state - show check your email message
+  if (success && !devToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <GlassCard className="p-8 text-center">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', bounce: 0.5, delay: 0.2 }}
+                className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-2xl"
+                style={{ boxShadow: '0 0 60px rgba(16, 185, 129, 0.4)' }}
+              >
+                <Inbox className="w-10 h-10 text-white" />
+              </motion.div>
 
-        <div className="mb-4">
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email
-          </label>
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+              <h2 className="text-2xl font-bold text-white mb-3">Check Your Email</h2>
+
+              <p className="text-white/70 mb-6">
+                {emailSent
+                  ? `We've sent a password reset link to ${email}. The link will expire in 15 minutes.`
+                  : `If an account exists for ${email}, you will receive a password reset link shortly.`}
+              </p>
+
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <p className="text-white/50 text-sm">
+                    Didn't receive the email? Check your spam folder or try again.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleTryAgain}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-white/70 hover:text-white hover:bg-white/5 transition-all duration-300"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Try a different email</span>
+                </button>
+
+                <Link
+                  to="/login"
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/20 text-white/80 hover:text-white hover:bg-white/5 hover:border-white/30 transition-all duration-300"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Login</span>
+                </Link>
+              </div>
+            </GlassCard>
+          </motion.div>
         </div>
+      </div>
+    )
+  }
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-8"
         >
-          {loading ? 'Submitting...' : 'Send reset link'}
-        </button>
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', bounce: 0.5, delay: 0.2 }}
+            className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 flex items-center justify-center shadow-2xl"
+            style={{ boxShadow: '0 0 60px rgba(99, 102, 241, 0.4)' }}
+          >
+            <KeyRound className="w-10 h-10 text-white" />
+          </motion.div>
+          <h1 className="text-3xl font-bold text-white mb-2">Forgot Password?</h1>
+          <p className="text-white/60">No worries, we'll send you reset instructions</p>
+        </motion.div>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
-          Remembered your password?{' '}
-          <Link to="/login" className="text-indigo-600 hover:underline">
-            Back to Login
-          </Link>
-        </p>
+        {/* Form */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+        >
+          <GlassCard className="p-8">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3"
+                >
+                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-red-400 text-sm">{error}</p>
+                </motion.div>
+              )}
 
-        {devToken && (
-          <div className="mt-6 p-3 border rounded-md bg-gray-50">
-            <div className="text-xs text-gray-600 mb-2">
-              Development token (not shown in production):
-            </div>
-            <code className="block text-xs break-all mb-2">{devToken}</code>
-            <button
-              type="button"
-              onClick={goToReset}
-              className="w-full py-2 px-4 bg-gray-800 text-white rounded-md hover:bg-gray-900"
-            >
-              Continue to Reset Password
-            </button>
-          </div>
-        )}
-      </form>
+              <InputField
+                type="email"
+                label="Email Address"
+                icon={Mail}
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+
+              <GlowButton
+                type="submit"
+                loading={loading}
+                icon={Send}
+                fullWidth
+                size="lg"
+              >
+                {loading ? 'Sending...' : 'Send Reset Link'}
+              </GlowButton>
+
+              <Link
+                to="/login"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/20 text-white/80 hover:text-white hover:bg-white/5 hover:border-white/30 transition-all duration-300"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Login</span>
+              </Link>
+
+              {/* Dev token section - only shows when email is not configured */}
+              {devToken && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30"
+                >
+                  <div className="flex items-center gap-2 text-amber-400 text-sm mb-3">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="font-medium">Development Mode</span>
+                  </div>
+                  <p className="text-white/50 text-xs mb-3">
+                    Email service not configured. Use this token to reset your password:
+                  </p>
+                  <code className="block text-xs text-white/60 break-all mb-4 bg-black/20 p-2 rounded">
+                    {devToken}
+                  </code>
+                  <GlowButton
+                    type="button"
+                    onClick={goToReset}
+                    fullWidth
+                    variant="secondary"
+                  >
+                    Continue to Reset Password
+                  </GlowButton>
+                </motion.div>
+              )}
+            </form>
+          </GlassCard>
+        </motion.div>
+      </div>
     </div>
   )
 }

@@ -1,5 +1,27 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Users,
+  Plus,
+  Crown,
+  Mail,
+  UserPlus,
+  UserMinus,
+  Sparkles,
+  UsersRound
+} from 'lucide-react'
+import {
+  GlassCard,
+  GlowButton,
+  InputField,
+  PageContainer,
+  PageTitle,
+  Badge,
+  IconButton,
+  EmptyState
+} from '../components/ui'
+import { sideCannons } from '../components/ui/confetti'
 
 type Group = { id: number; name: string; owner_id: number; is_owner: boolean }
 type Member = { id: number; user_id: number; name: string; email: string }
@@ -12,6 +34,8 @@ export default function Groups() {
   const [newMemberEmail, setNewMemberEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     loadGroups()
@@ -52,13 +76,17 @@ export default function Groups() {
     if (!newGroupName.trim()) return
 
     setError('')
+    setCreating(true)
     try {
       const group = await api.createGroup(newGroupName.trim())
       setGroups([...groups, group])
       setSelectedGroup(group)
       setNewGroupName('')
+      sideCannons()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create group')
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -67,12 +95,15 @@ export default function Groups() {
     if (!selectedGroup || !newMemberEmail.trim()) return
 
     setError('')
+    setAdding(true)
     try {
       const member = await api.addMember(selectedGroup.id, newMemberEmail.trim())
       setMembers([...members, member])
       setNewMemberEmail('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add member')
+    } finally {
+      setAdding(false)
     }
   }
 
@@ -88,114 +119,251 @@ export default function Groups() {
   }
 
   if (loading) {
-    return <div className="text-center text-gray-500">Loading...</div>
+    return (
+      <PageContainer className="flex items-center justify-center min-h-[60vh]">
+        <div className="spinner" />
+      </PageContainer>
+    )
   }
 
   return (
-    <div className="grid md:grid-cols-2 gap-8">
-      {/* Left: Group list */}
-      <div>
-        <h2 className="text-xl font-bold mb-4">Your Groups</h2>
+    <PageContainer>
+      <PageTitle
+        title="Groups"
+        subtitle="Manage your tracking groups and members"
+        icon={UsersRound}
+      />
 
-        <div className="bg-white rounded-lg border divide-y">
-          {groups.length === 0 ? (
-            <div className="p-4 text-gray-500 text-center">No groups yet</div>
-          ) : (
-            groups.map((group) => (
-              <button
-                key={group.id}
-                onClick={() => setSelectedGroup(group)}
-                className={`w-full p-4 text-left hover:bg-gray-50 flex items-center justify-between ${
-                  selectedGroup?.id === group.id ? 'bg-indigo-50' : ''
-                }`}
-              >
-                <span className="font-medium">{group.name}</span>
-                {group.is_owner && (
-                  <span className="text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded">
-                    Owner
-                  </span>
-                )}
-              </button>
-            ))
-          )}
-        </div>
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Left: Group list */}
+        <div>
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <GlassCard>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Users className="w-5 h-5 text-purple-400" />
+                  Your Groups
+                </h2>
+                <span className="text-white/40 text-sm">{groups.length} groups</span>
+              </div>
 
-        {/* Create new group */}
-        <form onSubmit={createGroup} className="mt-4">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              placeholder="New group name"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-            >
-              Create
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Right: Group details / members */}
-      <div>
-        {selectedGroup ? (
-          <>
-            <h2 className="text-xl font-bold mb-4">{selectedGroup.name} - Members</h2>
-
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">{error}</div>
-            )}
-
-            <div className="bg-white rounded-lg border divide-y">
-              {members.map((member) => (
-                <div key={member.id} className="p-4 flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{member.name}</div>
-                    <div className="text-sm text-gray-500">{member.email}</div>
+              {groups.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+                    <Users className="w-8 h-8 text-white/30" />
                   </div>
-                  {selectedGroup.is_owner && member.user_id !== selectedGroup.owner_id && (
-                    <button
-                      onClick={() => removeMember(member.user_id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Remove
-                    </button>
-                  )}
+                  <p className="text-white/50">No groups yet</p>
+                  <p className="text-white/30 text-sm mt-1">Create one to get started</p>
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="space-y-2">
+                  {groups.map((group, index) => (
+                    <motion.button
+                      key={group.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => setSelectedGroup(group)}
+                      className={`w-full p-4 rounded-xl text-left transition-all duration-300 flex items-center justify-between group ${
+                        selectedGroup?.id === group.id
+                          ? 'bg-purple-500/20 border border-purple-500/30'
+                          : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            selectedGroup?.id === group.id
+                              ? 'bg-purple-500/30'
+                              : 'bg-white/10 group-hover:bg-white/15'
+                          }`}
+                        >
+                          <Sparkles
+                            className={`w-5 h-5 ${
+                              selectedGroup?.id === group.id
+                                ? 'text-purple-400'
+                                : 'text-white/50 group-hover:text-white/70'
+                            }`}
+                          />
+                        </div>
+                        <span
+                          className={`font-medium ${
+                            selectedGroup?.id === group.id
+                              ? 'text-white'
+                              : 'text-white/80 group-hover:text-white'
+                          }`}
+                        >
+                          {group.name}
+                        </span>
+                      </div>
+                      {group.is_owner && (
+                        <Badge variant="owner" icon={Crown}>
+                          Owner
+                        </Badge>
+                      )}
+                    </motion.button>
+                  ))}
+                </div>
+              )}
 
-            {/* Add member (owner only) */}
-            {selectedGroup.is_owner && (
-              <form onSubmit={addMember} className="mt-4">
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    value={newMemberEmail}
-                    onChange={(e) => setNewMemberEmail(e.target.value)}
-                    placeholder="Member email"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <button
+              {/* Create new group */}
+              <form onSubmit={createGroup} className="mt-6 pt-6 border-t border-white/10">
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <InputField
+                      type="text"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="Enter group name"
+                      icon={Plus}
+                    />
+                  </div>
+                  <GlowButton
                     type="submit"
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                    loading={creating}
+                    disabled={!newGroupName.trim()}
                   >
-                    Add
-                  </button>
+                    Create
+                  </GlowButton>
                 </div>
               </form>
-            )}
-          </>
-        ) : (
-          <div className="text-center text-gray-500 py-12">
-            Select a group to view members
-          </div>
-        )}
+            </GlassCard>
+          </motion.div>
+        </div>
+
+        {/* Right: Group details / members */}
+        <div>
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+          >
+            <AnimatePresence mode="wait">
+              {selectedGroup ? (
+                <motion.div
+                  key={selectedGroup.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                >
+                  <GlassCard>
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-lg font-semibold text-white">
+                          {selectedGroup.name}
+                        </h2>
+                        <p className="text-white/50 text-sm">{members.length} members</p>
+                      </div>
+                      {selectedGroup.is_owner && (
+                        <Badge variant="owner" icon={Crown}>
+                          You're the owner
+                        </Badge>
+                      )}
+                    </div>
+
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/30"
+                      >
+                        <p className="text-red-400 text-sm">{error}</p>
+                      </motion.div>
+                    )}
+
+                    {/* Members list */}
+                    <div className="space-y-3">
+                      {members.map((member, index) => (
+                        <motion.div
+                          key={member.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-medium">
+                              {member.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-medium text-white flex items-center gap-2">
+                                {member.name}
+                                {member.user_id === selectedGroup.owner_id && (
+                                  <Crown className="w-4 h-4 text-amber-400" />
+                                )}
+                              </div>
+                              <div className="text-sm text-white/50">{member.email}</div>
+                            </div>
+                          </div>
+                          {selectedGroup.is_owner &&
+                            member.user_id !== selectedGroup.owner_id && (
+                              <IconButton
+                                icon={UserMinus}
+                                variant="danger"
+                                size="sm"
+                                tooltip="Remove member"
+                                onClick={() => removeMember(member.user_id)}
+                              />
+                            )}
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    {/* Add member (owner only) */}
+                    {selectedGroup.is_owner && (
+                      <form
+                        onSubmit={addMember}
+                        className="mt-6 pt-6 border-t border-white/10"
+                      >
+                        <label className="block text-sm font-medium text-white/80 mb-3">
+                          Add a new member
+                        </label>
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <InputField
+                              type="email"
+                              value={newMemberEmail}
+                              onChange={(e) => setNewMemberEmail(e.target.value)}
+                              placeholder="Enter email address"
+                              icon={Mail}
+                            />
+                          </div>
+                          <GlowButton
+                            type="submit"
+                            loading={adding}
+                            disabled={!newMemberEmail.trim()}
+                            icon={UserPlus}
+                            variant="success"
+                          >
+                            Add
+                          </GlowButton>
+                        </div>
+                      </form>
+                    )}
+                  </GlassCard>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <EmptyState
+                    icon={Users}
+                    title="Select a Group"
+                    description="Choose a group from the list to view and manage its members"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }

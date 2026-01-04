@@ -19,9 +19,83 @@ const inferredRoot = inferDefaultApi()
 const API_ROOT = explicitRoot || inferredRoot
 const API_BASE = API_ROOT ? `${API_ROOT.replace(/\/$/, '')}/api` : '/api'
 
+/**
+ * Custom API error class that preserves HTTP status code and error details
+ */
+export class ApiError extends Error {
+  status: number
+  code?: string
+  detail: string
+
+  constructor(status: number, detail: string, code?: string) {
+    super(detail)
+    this.name = 'ApiError'
+    this.status = status
+    this.detail = detail
+    this.code = code
+  }
+
+  /**
+   * Check if this is an authentication error (401)
+   */
+  isAuthError(): boolean {
+    return this.status === 401
+  }
+
+  /**
+   * Check if this is a forbidden error (403)
+   */
+  isForbiddenError(): boolean {
+    return this.status === 403
+  }
+
+  /**
+   * Check if this is a not found error (404)
+   */
+  isNotFoundError(): boolean {
+    return this.status === 404
+  }
+
+  /**
+   * Check if this is a validation error (400/422)
+   */
+  isValidationError(): boolean {
+    return this.status === 400 || this.status === 422
+  }
+
+  /**
+   * Check if this is a server error (5xx)
+   */
+  isServerError(): boolean {
+    return this.status >= 500
+  }
+
+  /**
+   * Check if this is a network error
+   */
+  isNetworkError(): boolean {
+    return this.status === 0
+  }
+}
+
 type RequestOptions = {
   method?: string
   body?: unknown
+}
+
+// Event for auth state changes (session expired, etc.)
+type AuthEventType = 'session_expired' | 'unauthorized'
+type AuthEventCallback = (event: AuthEventType) => void
+let authEventCallback: AuthEventCallback | null = null
+
+/**
+ * Register a callback for auth events (session expiry, etc.)
+ */
+export function onAuthEvent(callback: AuthEventCallback): () => void {
+  authEventCallback = callback
+  return () => {
+    authEventCallback = null
+  }
 }
 
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
@@ -37,14 +111,56 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     config.body = JSON.stringify(options.body)
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, config)
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'An error occurred' }))
-    throw new Error(error.detail || 'Request failed')
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, config)
+  } catch (err) {
+    // Network error (no internet, CORS blocked, server unreachable)
+    throw new ApiError(
+      0,
+      'Unable to connect to server. Please check your internet connection.',
+      'NETWORK_ERROR'
+    )
   }
 
-  return response.json()
+  if (!response.ok) {
+    let errorData: { detail?: string; code?: string } = { detail: 'An error occurred' }
+
+    try {
+      errorData = await response.json()
+    } catch {
+      // Response wasn't JSON, use status text
+      errorData = { detail: response.statusText || 'Request failed' }
+    }
+
+    const detail = errorData.detail || 'Request failed'
+    const code = errorData.code
+    const apiError = new ApiError(response.status, detail, code)
+
+    // Notify auth callback for 401 errors (but not for login/register endpoints)
+    if (apiError.isAuthError() && authEventCallback) {
+      const isAuthEndpoint = endpoint.startsWith('/auth/login') ||
+                             endpoint.startsWith('/auth/register') ||
+                             endpoint.startsWith('/auth/password')
+      if (!isAuthEndpoint) {
+        authEventCallback('session_expired')
+      }
+    }
+
+    throw apiError
+  }
+
+  // Handle empty responses (204 No Content, etc.)
+  const contentType = response.headers.get('content-type')
+  if (!contentType || !contentType.includes('application/json')) {
+    return {} as T
+  }
+
+  try {
+    return await response.json()
+  } catch {
+    return {} as T
+  }
 }
 
 // Auth
@@ -61,7 +177,13 @@ export const api = {
   getMe: () => request<{ id: number; email: string; name: string }>('/auth/me'),
 
   forgotPassword: (email: string) =>
-    request<{ message: string; reset_token?: string }>('/auth/password/forgot', {
+    request<{
+      message: string
+      email_sent?: boolean
+      reset_token?: string
+      email_configured?: boolean
+      email_error?: string
+    }>('/auth/password/forgot', {
       method: 'POST',
       body: { email },
     }),
@@ -108,7 +230,7 @@ export const api = {
     }[]>(`/entries?${params}`)
   },
 
-  createEntry: (data: { group_id: number; section: string; content: string; date?: string }) =>
+  createEntry: (data: { group_id: number; section: string; content: string; entry_date?: string }) =>
     request<{
       id: number
       section: string

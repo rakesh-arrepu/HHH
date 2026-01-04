@@ -28,3 +28,6 @@ backend/*.db
 # Logs
 *.log
 *.pid
+
+# Claude Code Skills (local/personal)
+.claude/
