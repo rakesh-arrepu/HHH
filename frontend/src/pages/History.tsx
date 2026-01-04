@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   CalendarDays,
   TrendingUp,
@@ -22,8 +22,9 @@ import {
   PageTitle,
   EmptyState
 } from '../components/ui'
+import { MemberSelector, type Member } from '../components/MemberSelector'
 
-type Group = { id: number; name: string }
+type Group = { id: number; name: string; is_owner: boolean }
 type HistoryDay = { date: string; completed_sections: string[]; is_complete: boolean }
 
 export default function History() {
@@ -31,7 +32,10 @@ export default function History() {
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null)
   const [history, setHistory] = useState<HistoryDay[]>([])
   const [loading, setLoading] = useState(true)
-  const [hoveredDay, setHoveredDay] = useState<HistoryDay | null>(null)
+  const [selectedDay, setSelectedDay] = useState<HistoryDay | null>(null)
+  const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
+  const [members, setMembers] = useState<Member[]>([])
+  const [currentUserId, setCurrentUserId] = useState<number>(0)
 
   // Month/Year picker state
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()) // 0-11
@@ -44,13 +48,23 @@ export default function History() {
 
   useEffect(() => {
     loadGroups()
+    loadCurrentUser()
   }, [])
 
   useEffect(() => {
     if (selectedGroup) {
+      loadMembers()
       loadHistory()
+      // Reset selectedUserId when switching groups
+      setSelectedUserId(undefined)
     }
   }, [selectedGroup, selectedMonth, selectedYear])
+
+  useEffect(() => {
+    if (selectedGroup && selectedUserId !== undefined) {
+      loadHistory()
+    }
+  }, [selectedUserId])
 
   const loadGroups = async () => {
     try {
@@ -66,6 +80,25 @@ export default function History() {
     }
   }
 
+  const loadCurrentUser = async () => {
+    try {
+      const user = await api.getMe()
+      setCurrentUserId(user.id)
+    } catch (err) {
+      console.error('Failed to load current user:', err)
+    }
+  }
+
+  const loadMembers = async () => {
+    if (!selectedGroup) return
+    try {
+      const data = await api.getMembers(selectedGroup)
+      setMembers(data)
+    } catch (err) {
+      console.error('Failed to load members:', err)
+    }
+  }
+
   const loadHistory = async () => {
     if (!selectedGroup) return
 
@@ -73,7 +106,7 @@ export default function History() {
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate()
 
     try {
-      const data = await api.getHistory(selectedGroup, daysInMonth)
+      const data = await api.getHistory(selectedGroup, daysInMonth, selectedUserId)
 
       // Filter history to only include dates from selected month
       const filteredHistory = data.filter(day => {
@@ -217,6 +250,8 @@ export default function History() {
   }
 
   const calendarDays = generateCalendarDays()
+  const currentGroup = groups.find(g => g.id === selectedGroup)
+  const isOwner = currentGroup?.is_owner || false
 
   return (
     <PageContainer>
@@ -226,13 +261,26 @@ export default function History() {
           subtitle="Your monthly tracking journey"
           icon={CalendarDays}
         />
-        <div className="w-full sm:w-48">
-          <SelectField
-            options={groupOptions}
-            value={selectedGroup || ''}
-            onChange={(e) => setSelectedGroup(Number(e.target.value))}
-            icon={Users}
-          />
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+          <div className="w-full sm:w-48">
+            <SelectField
+              options={groupOptions}
+              value={selectedGroup || ''}
+              onChange={(e) => setSelectedGroup(Number(e.target.value))}
+              icon={Users}
+            />
+          </div>
+          {isOwner && members.length > 0 && (
+            <div className="w-full sm:w-60">
+              <MemberSelector
+                members={members}
+                selectedUserId={selectedUserId}
+                onSelectUser={setSelectedUserId}
+                currentUserId={currentUserId}
+                isOwner={isOwner}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -326,24 +374,11 @@ export default function History() {
         transition={{ delay: 0.3 }}
       >
         <GlassCard>
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-6">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-purple-400" />
               {monthNames[selectedMonth]} {selectedYear}
             </h2>
-            {hoveredDay && (
-              <motion.div
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="text-sm text-white/60"
-              >
-                {new Date(hoveredDay.date + 'T00:00:00').toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })}{' '}
-                - {hoveredDay.completed_sections.length}/3 sections
-              </motion.div>
-            )}
           </div>
 
           {/* Calendar Grid - Enhanced with Borders */}
@@ -396,21 +431,24 @@ export default function History() {
                   const isFutureDate = dayDate > today
                   const isWeekend = date.getDay() === 0 || date.getDay() === 6
 
+                  const isSelected = selectedDay?.date === day.date
+
                   return (
-                    <motion.div
+                    <motion.button
                       key={day.date}
+                      type="button"
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.3 + index * 0.01 }}
-                      onMouseEnter={() => !isFutureDate && setHoveredDay(day)}
-                      onMouseLeave={() => setHoveredDay(null)}
-                      onClick={() => !isFutureDate && setHoveredDay(hoveredDay?.date === day.date ? null : day)}
+                      onClick={() => !isFutureDate && setSelectedDay(isSelected ? null : day)}
+                      disabled={isFutureDate}
                       className={`
-                        relative w-12 h-12 sm:w-16 sm:h-16 flex flex-col items-center justify-center transition-all duration-300
+                        relative w-12 h-12 sm:w-16 sm:h-16 flex flex-col items-center justify-center transition-all duration-200
                         ${!isLastColumn ? 'border-r border-white/10' : ''}
                         ${!isLastRow ? 'border-b border-white/10' : ''}
                         ${isFutureDate ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:scale-105 hover:z-10'}
                         ${isWeekend ? 'bg-purple-500/5' : 'bg-transparent'}
+                        ${isSelected ? 'ring-2 ring-purple-400 ring-inset z-20' : ''}
                       `}
                     >
                       {/* Background gradient based on completion */}
@@ -483,9 +521,9 @@ export default function History() {
 
                       {/* Hover overlay effect */}
                       {!isFutureDate && (
-                        <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-all duration-300" />
+                        <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-all duration-200 pointer-events-none" />
                       )}
-                    </motion.div>
+                    </motion.button>
                   )
                 })}
               </div>
@@ -512,46 +550,55 @@ export default function History() {
             </div>
           </div>
 
-          {/* Selected/Hovered day details */}
-          {hoveredDay && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10"
-            >
-              <p className="text-white font-medium mb-2">
-                {new Date(hoveredDay.date + 'T00:00:00').toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </p>
-              {hoveredDay.completed_sections.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {hoveredDay.completed_sections.map((section) => {
-                    const Icon = getSectionIcon(section)
-                    return (
-                      <div
-                        key={section}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-                          section === 'health'
-                            ? 'bg-emerald-500/20 text-emerald-400'
-                            : section === 'happiness'
-                            ? 'bg-amber-500/20 text-amber-400'
-                            : 'bg-yellow-500/20 text-yellow-400'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                        <span className="text-sm capitalize font-medium">{section}</span>
+          {/* Selected day details - Fixed height container to prevent layout shift */}
+          <div className="mt-6 min-h-[100px]">
+            <AnimatePresence mode="wait">
+              {selectedDay && (
+                <motion.div
+                  key={selectedDay.date}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <p className="text-white font-medium mb-3">
+                      {new Date(selectedDay.date + 'T00:00:00').toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                    {selectedDay.completed_sections.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedDay.completed_sections.map((section) => {
+                          const Icon = getSectionIcon(section)
+                          return (
+                            <div
+                              key={section}
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                                section === 'health'
+                                  ? 'bg-emerald-500/20 text-emerald-400'
+                                  : section === 'happiness'
+                                  ? 'bg-amber-500/20 text-amber-400'
+                                  : 'bg-yellow-500/20 text-yellow-400'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4" />
+                              <span className="text-sm capitalize font-medium">{section}</span>
+                            </div>
+                          )
+                        })}
                       </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-white/40 text-sm">No entries for this day</p>
+                    ) : (
+                      <p className="text-white/40 text-sm">No entries for this day</p>
+                    )}
+                  </div>
+                </motion.div>
               )}
-            </motion.div>
-          )}
+            </AnimatePresence>
+          </div>
         </GlassCard>
       </motion.div>
     </PageContainer>

@@ -40,8 +40,6 @@ export default function Groups() {
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [transferring, setTransferring] = useState(false)
-  const [showTransferModal, setShowTransferModal] = useState(false)
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null)
   const [editingGroupName, setEditingGroupName] = useState('')
   const [updating, setUpdating] = useState(false)
@@ -138,7 +136,6 @@ export default function Groups() {
     }
 
     setError('')
-    setTransferring(true)
     try {
       await api.transferOwnership(selectedGroup.id, newOwnerId)
 
@@ -152,14 +149,10 @@ export default function Groups() {
       // Update selected group
       setSelectedGroup({ ...selectedGroup, owner_id: newOwnerId, is_owner: false })
 
-      setShowTransferModal(false)
-
       // Show success message
       alert(`Ownership successfully transferred to ${newOwner.name}!`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to transfer ownership')
-    } finally {
-      setTransferring(false)
     }
   }
 
@@ -436,7 +429,7 @@ export default function Groups() {
                                 <>
                                   <IconButton
                                     icon={ArrowRightLeft}
-                                    variant="warning"
+                                    variant="default"
                                     size="sm"
                                     tooltip="Transfer ownership"
                                     onClick={() => transferOwnership(member.user_id)}

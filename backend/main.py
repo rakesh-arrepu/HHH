@@ -25,6 +25,13 @@ def api_error(status_code: int, detail: str, code: str | None = None) -> HTTPExc
         error_detail["code"] = code
     return HTTPException(status_code=status_code, detail=detail)
 
+
+def verify_group_owner(db: Session, group_id: int, user_id: int) -> bool:
+    """Verify if user is the owner of the specified group."""
+    group = db.query(Group).filter(Group.id == group_id).first()
+    return group is not None and group.owner_id == user_id
+
+
 # Create tables
 Base.metadata.create_all(bind=engine)
 
@@ -784,23 +791,26 @@ def transfer_ownership(
 def get_entries(
     group_id: int,
     entry_date: Optional[date] = None,
+    user_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get entries for a group, optionally filtered by date.
+    Get entries for a group, optionally filtered by date and user.
 
     Args:
         group_id: The group to get entries for
         entry_date: Optional date filter (YYYY-MM-DD format)
+        user_id: Optional user ID filter (owner-only, defaults to current user)
 
     Returns:
         List of EntryResponse objects
 
     Errors:
+        400: Invalid date or parameters
         401: Not authenticated
-        403: Not a member of this group
-        404: Group not found
+        403: Not a member of this group, or non-owner trying to view other users' data
+        404: Group not found, or requested user not a member
         500: Database error
     """
     try:
@@ -818,7 +828,30 @@ def get_entries(
         if not is_member:
             raise HTTPException(status_code=403, detail="You are not a member of this group")
 
-        query = db.query(Entry).filter(Entry.group_id == group_id)
+        # Determine which user's entries to fetch
+        target_user_id = current_user.id  # Default: current user only (SECURITY FIX)
+
+        if user_id is not None:
+            # Someone is requesting another user's data
+            if not verify_group_owner(db, group_id, current_user.id):
+                raise HTTPException(status_code=403, detail="Only group owners can view other members' data")
+
+            # Verify requested user is a member
+            is_target_member = db.query(GroupMember).filter(
+                GroupMember.group_id == group_id,
+                GroupMember.user_id == user_id
+            ).first()
+
+            if not is_target_member:
+                raise HTTPException(status_code=404, detail="User is not a member of this group")
+
+            target_user_id = user_id
+
+        # CRITICAL FIX: Add user filter (was missing!)
+        query = db.query(Entry).filter(
+            Entry.group_id == group_id,
+            Entry.user_id == target_user_id
+        )
 
         if entry_date:
             # Validate date is not in the future
@@ -938,19 +971,24 @@ DEFAULT_HISTORY_DAYS = 30
 @app.get("/api/analytics/streak", response_model=StreakResponse)
 def get_streak(
     group_id: int,
+    user_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get the current streak (consecutive days with all 3 sections completed) for a user in a group.
 
+    Args:
+        group_id: The group to get streak for
+        user_id: Optional user ID filter (owner-only, defaults to current user)
+
     Returns:
         StreakResponse with streak count and last complete date
 
     Errors:
         401: Not authenticated
-        403: Not a member of this group
-        404: Group not found
+        403: Not a member of this group, or non-owner trying to view other users' data
+        404: Group not found, or requested user not a member
         500: Database error
     """
     try:
@@ -968,11 +1006,30 @@ def get_streak(
         if not is_member:
             raise HTTPException(status_code=403, detail="You are not a member of this group")
 
+        # Determine which user's streak to fetch
+        target_user_id = current_user.id  # Default: current user only
+
+        if user_id is not None:
+            # Someone is requesting another user's data
+            if not verify_group_owner(db, group_id, current_user.id):
+                raise HTTPException(status_code=403, detail="Only group owners can view other members' data")
+
+            # Verify requested user is a member
+            is_target_member = db.query(GroupMember).filter(
+                GroupMember.group_id == group_id,
+                GroupMember.user_id == user_id
+            ).first()
+
+            if not is_target_member:
+                raise HTTPException(status_code=404, detail="User is not a member of this group")
+
+            target_user_id = user_id
+
         # Get all complete days (3 sections) for this user in this group
         complete_days = (
             db.query(Entry.date)
             .filter(
-                Entry.user_id == current_user.id,
+                Entry.user_id == target_user_id,
                 Entry.group_id == group_id
             )
             .group_by(Entry.date)
@@ -1015,6 +1072,7 @@ def get_streak(
 def get_history(
     group_id: int,
     days: int = DEFAULT_HISTORY_DAYS,
+    user_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1024,6 +1082,7 @@ def get_history(
     Args:
         group_id: The group to get history for
         days: Number of days to look back (default 30, max 365)
+        user_id: Optional user ID filter (owner-only, defaults to current user)
 
     Returns:
         List of HistoryDay objects sorted by date descending
@@ -1031,8 +1090,8 @@ def get_history(
     Errors:
         400: Invalid days parameter
         401: Not authenticated
-        403: Not a member of this group
-        404: Group not found
+        403: Not a member of this group, or non-owner trying to view other users' data
+        404: Group not found, or requested user not a member
         500: Database error
     """
     try:
@@ -1056,10 +1115,29 @@ def get_history(
         if not is_member:
             raise HTTPException(status_code=403, detail="You are not a member of this group")
 
+        # Determine which user's history to fetch
+        target_user_id = current_user.id  # Default: current user only
+
+        if user_id is not None:
+            # Someone is requesting another user's data
+            if not verify_group_owner(db, group_id, current_user.id):
+                raise HTTPException(status_code=403, detail="Only group owners can view other members' data")
+
+            # Verify requested user is a member
+            is_target_member = db.query(GroupMember).filter(
+                GroupMember.group_id == group_id,
+                GroupMember.user_id == user_id
+            ).first()
+
+            if not is_target_member:
+                raise HTTPException(status_code=404, detail="User is not a member of this group")
+
+            target_user_id = user_id
+
         start_date = date.today() - timedelta(days=days)
 
         entries = db.query(Entry).filter(
-            Entry.user_id == current_user.id,
+            Entry.user_id == target_user_id,
             Entry.group_id == group_id,
             Entry.date >= start_date
         ).all()

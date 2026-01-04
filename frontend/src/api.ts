@@ -232,9 +232,10 @@ export const api = {
     ),
 
   // Entries
-  getEntries: (groupId: number, date?: string) => {
+  getEntries: (groupId: number, date?: string, userId?: number) => {
     const params = new URLSearchParams({ group_id: String(groupId) })
     if (date) params.append('entry_date', date)
+    if (userId !== undefined) params.append('user_id', String(userId))
     return request<{
       id: number
       section: string
@@ -256,11 +257,20 @@ export const api = {
     }>('/entries', { method: 'POST', body: data }),
 
   // Analytics
-  getStreak: (groupId: number) =>
-    request<{ streak: number; last_complete_date: string | null }>(`/analytics/streak?group_id=${groupId}`),
+  getStreak: (groupId: number, userId?: number) => {
+    const params = new URLSearchParams({ group_id: String(groupId) })
+    if (userId !== undefined) params.append('user_id', String(userId))
+    return request<{ streak: number; last_complete_date: string | null }>(`/analytics/streak?${params}`)
+  },
 
-  getHistory: (groupId: number, days = 30) =>
-    request<{ date: string; completed_sections: string[]; is_complete: boolean }[]>(
-      `/analytics/history?group_id=${groupId}&days=${days}`
-    ),
+  getHistory: (groupId: number, days = 30, userId?: number) => {
+    const params = new URLSearchParams({
+      group_id: String(groupId),
+      days: String(days)
+    })
+    if (userId !== undefined) params.append('user_id', String(userId))
+    return request<{ date: string; completed_sections: string[]; is_complete: boolean }[]>(
+      `/analytics/history?${params}`
+    )
+  },
 }

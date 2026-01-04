@@ -28,6 +28,7 @@ import {
   EmptyState
 } from '../components/ui'
 import { celebrateAllComplete, celebrateStreak } from '../components/ui/confetti'
+import { MemberSelector, type Member } from '../components/MemberSelector'
 
 type Group = { id: number; name: string; is_owner: boolean }
 
@@ -96,6 +97,9 @@ export default function Journal() {
   const [selectedDate, setSelectedDate] = useState(getTodayDate())
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [filledDates, setFilledDates] = useState<Set<string>>(new Set())
+  const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
+  const [members, setMembers] = useState<Member[]>([])
+  const [currentUserId, setCurrentUserId] = useState<number>(0)
   const prevCompleteRef = useRef(false)
   const datePickerRef = useRef<HTMLDivElement>(null)
 
@@ -112,15 +116,29 @@ export default function Journal() {
 
   useEffect(() => {
     loadGroups()
+    loadCurrentUser()
   }, [])
 
   useEffect(() => {
     if (selectedGroup) {
-      loadEntriesForDate(selectedDate)
-      loadStreak()
-      loadFilledDates()
+      loadMembers()
+      loadEntriesForDate(selectedDate, selectedUserId)
+      loadStreak(selectedUserId)
+      loadFilledDates(selectedUserId)
+      // Reset selectedUserId when switching groups
+      if (selectedUserId !== undefined) {
+        setSelectedUserId(undefined)
+      }
     }
-  }, [selectedGroup, selectedDate])
+  }, [selectedGroup])
+
+  useEffect(() => {
+    if (selectedGroup) {
+      loadEntriesForDate(selectedDate, selectedUserId)
+      loadStreak(selectedUserId)
+      loadFilledDates(selectedUserId)
+    }
+  }, [selectedDate, selectedUserId])
 
   // Celebrate when all sections are completed
   const completedCount = Object.keys(entries).length
@@ -147,10 +165,29 @@ export default function Journal() {
     }
   }
 
-  const loadEntriesForDate = async (date: string) => {
+  const loadCurrentUser = async () => {
+    try {
+      const user = await api.getMe()
+      setCurrentUserId(user.id)
+    } catch (err) {
+      console.error('Failed to load current user:', err)
+    }
+  }
+
+  const loadMembers = async () => {
     if (!selectedGroup) return
     try {
-      const data = await api.getEntries(selectedGroup, date)
+      const data = await api.getMembers(selectedGroup)
+      setMembers(data)
+    } catch (err) {
+      console.error('Failed to load members:', err)
+    }
+  }
+
+  const loadEntriesForDate = async (date: string, userId?: number) => {
+    if (!selectedGroup) return
+    try {
+      const data = await api.getEntries(selectedGroup, date, userId)
       const entriesMap: Record<string, string> = {}
       data.forEach((e) => {
         entriesMap[e.section] = e.content
@@ -161,10 +198,10 @@ export default function Journal() {
     }
   }
 
-  const loadFilledDates = async () => {
+  const loadFilledDates = async (userId?: number) => {
     if (!selectedGroup) return
     try {
-      const history = await api.getHistory(selectedGroup, 90)
+      const history = await api.getHistory(selectedGroup, 90, userId)
       const dates = new Set<string>()
       history.forEach((day) => {
         if (day.completed_sections.length > 0) {
@@ -177,10 +214,10 @@ export default function Journal() {
     }
   }
 
-  const loadStreak = async () => {
+  const loadStreak = async (userId?: number) => {
     if (!selectedGroup) return
     try {
-      const data = await api.getStreak(selectedGroup)
+      const data = await api.getStreak(selectedGroup, userId)
       setStreak(data.streak)
       if (data.streak > 0 && data.streak % 7 === 0) {
         setTimeout(() => celebrateStreak(data.streak), 500)
@@ -261,10 +298,14 @@ export default function Journal() {
 
   const groupOptions = groups.map((g) => ({ value: g.id, label: g.name }))
 
+  const currentGroup = groups.find(g => g.id === selectedGroup)
+  const isOwner = currentGroup?.is_owner || false
+  const isViewingOthers = selectedUserId !== undefined
+
   return (
     <PageContainer>
-      {/* Top Bar: Group + Streak */}
-      <div className="flex items-center justify-between gap-4 mb-6">
+      {/* Top Bar: Group + Member Selector + Streak */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
         <div className="flex-1 max-w-[200px]">
           <SelectField
             options={groupOptions}
@@ -273,6 +314,18 @@ export default function Journal() {
             icon={Users}
           />
         </div>
+
+        {isOwner && members.length > 0 && (
+          <div className="flex-1 max-w-[250px]">
+            <MemberSelector
+              members={members}
+              selectedUserId={selectedUserId}
+              onSelectUser={setSelectedUserId}
+              currentUserId={currentUserId}
+              isOwner={isOwner}
+            />
+          </div>
+        )}
 
         <motion.div
           initial={{ scale: 0 }}
@@ -426,6 +479,7 @@ export default function Journal() {
               content={entries[section.key] || ''}
               onSave={(content) => saveEntry(section.key, content)}
               saving={saving === section.key}
+              isViewingOthers={isViewingOthers}
             />
           </motion.div>
         ))}
@@ -439,6 +493,7 @@ function EntryCard({
   content,
   onSave,
   saving,
+  isViewingOthers = false,
 }: {
   section: {
     key: string
@@ -452,6 +507,7 @@ function EntryCard({
   content: string
   onSave: (content: string) => void
   saving: boolean
+  isViewingOthers?: boolean
 }) {
   const [text, setText] = useState(content)
   const [editing, setEditing] = useState(false)
@@ -529,30 +585,33 @@ function EntryCard({
               <TextareaField
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={`What did you do for ${section.label.toLowerCase()} today?`}
+                placeholder={isViewingOthers ? 'Viewing another user\'s entry' : `What did you do for ${section.label.toLowerCase()} today?`}
                 rows={4}
                 className="mb-4"
+                disabled={isViewingOthers}
               />
-              <div className="flex justify-end gap-3">
-                {hasContent && (
+              {!isViewingOthers && (
+                <div className="flex justify-end gap-3">
+                  {hasContent && (
+                    <GlowButton
+                      variant="ghost"
+                      icon={X}
+                      onClick={handleCancel}
+                    >
+                      Cancel
+                    </GlowButton>
+                  )}
                   <GlowButton
-                    variant="ghost"
-                    icon={X}
-                    onClick={handleCancel}
+                    variant="success"
+                    icon={Save}
+                    onClick={handleSave}
+                    loading={saving}
+                    disabled={!text.trim() || !isDirty}
                   >
-                    Cancel
+                    {saving ? 'Saving...' : 'Save Entry'}
                   </GlowButton>
-                )}
-                <GlowButton
-                  variant="success"
-                  icon={Save}
-                  onClick={handleSave}
-                  loading={saving}
-                  disabled={!text.trim() || !isDirty}
-                >
-                  {saving ? 'Saving...' : 'Save Entry'}
-                </GlowButton>
-              </div>
+                </div>
+              )}
             </motion.div>
           ) : (
             <motion.div
@@ -564,14 +623,16 @@ function EntryCard({
               <p className="text-white/80 whitespace-pre-wrap leading-relaxed mb-4">
                 {content}
               </p>
-              <GlowButton
-                variant="ghost"
-                size="sm"
-                icon={Edit3}
-                onClick={() => setEditing(true)}
-              >
-                Edit Entry
-              </GlowButton>
+              {!isViewingOthers && (
+                <GlowButton
+                  variant="ghost"
+                  size="sm"
+                  icon={Edit3}
+                  onClick={() => setEditing(true)}
+                >
+                  Edit Entry
+                </GlowButton>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
