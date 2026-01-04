@@ -10,7 +10,10 @@ import {
   Smile,
   Coins,
   Check,
-  Minus
+  Minus,
+  ChevronLeft,
+  ChevronRight,
+  Calendar
 } from 'lucide-react'
 import {
   GlassCard,
@@ -30,6 +33,15 @@ export default function History() {
   const [loading, setLoading] = useState(true)
   const [hoveredDay, setHoveredDay] = useState<HistoryDay | null>(null)
 
+  // Month/Year picker state
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()) // 0-11
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ]
+
   useEffect(() => {
     loadGroups()
   }, [])
@@ -38,7 +50,7 @@ export default function History() {
     if (selectedGroup) {
       loadHistory()
     }
-  }, [selectedGroup])
+  }, [selectedGroup, selectedMonth, selectedYear])
 
   const loadGroups = async () => {
     try {
@@ -56,12 +68,53 @@ export default function History() {
 
   const loadHistory = async () => {
     if (!selectedGroup) return
+
+    // Calculate days in selected month
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate()
+
     try {
-      const data = await api.getHistory(selectedGroup, 30)
-      setHistory(data)
+      const data = await api.getHistory(selectedGroup, daysInMonth)
+
+      // Filter history to only include dates from selected month
+      const filteredHistory = data.filter(day => {
+        const dayDate = new Date(day.date)
+        return dayDate.getMonth() === selectedMonth && dayDate.getFullYear() === selectedYear
+      })
+
+      setHistory(filteredHistory)
     } catch (err) {
       console.error('Failed to load history:', err)
     }
+  }
+
+  const goToPreviousMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11)
+      setSelectedYear(selectedYear - 1)
+    } else {
+      setSelectedMonth(selectedMonth - 1)
+    }
+  }
+
+  const goToNextMonth = () => {
+    const currentDate = new Date()
+    const isCurrentMonth = selectedMonth === currentDate.getMonth() && selectedYear === currentDate.getFullYear()
+
+    // Don't allow going to future months
+    if (isCurrentMonth) return
+
+    if (selectedMonth === 11) {
+      setSelectedMonth(0)
+      setSelectedYear(selectedYear + 1)
+    } else {
+      setSelectedMonth(selectedMonth + 1)
+    }
+  }
+
+  const goToCurrentMonth = () => {
+    const now = new Date()
+    setSelectedMonth(now.getMonth())
+    setSelectedYear(now.getFullYear())
   }
 
   if (loading) {
@@ -85,11 +138,15 @@ export default function History() {
   }
 
   // Calculate stats
+  const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate()
+  const currentDate = new Date()
+  const isCurrentMonth = selectedMonth === currentDate.getMonth() && selectedYear === currentDate.getFullYear()
+
   const completeDays = history.filter((d) => d.is_complete).length
   const partialDays = history.filter(
     (d) => d.completed_sections.length > 0 && !d.is_complete
   ).length
-  const completionRate = Math.round((completeDays / 30) * 100)
+  const completionRate = daysInMonth > 0 ? Math.round((completeDays / daysInMonth) * 100) : 0
 
   const stats = [
     {
@@ -130,12 +187,43 @@ export default function History() {
     }
   }
 
+  // Generate calendar days for the selected month
+  const generateCalendarDays = () => {
+    const firstDayOfMonth = new Date(selectedYear, selectedMonth, 1)
+    const lastDayOfMonth = new Date(selectedYear, selectedMonth + 1, 0)
+    const startDayOfWeek = firstDayOfMonth.getDay() // 0-6 (Sun-Sat)
+    const totalDays = lastDayOfMonth.getDate()
+
+    const calendarDays: (HistoryDay | null)[] = []
+
+    // Add empty cells for days before the 1st
+    for (let i = 0; i < startDayOfWeek; i++) {
+      calendarDays.push(null)
+    }
+
+    // Add actual days of the month
+    for (let day = 1; day <= totalDays; day++) {
+      const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      const dayData = history.find(h => h.date === dateStr)
+
+      calendarDays.push(dayData || {
+        date: dateStr,
+        completed_sections: [],
+        is_complete: false
+      })
+    }
+
+    return calendarDays
+  }
+
+  const calendarDays = generateCalendarDays()
+
   return (
     <PageContainer>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <PageTitle
           title="History"
-          subtitle="Your 30-day tracking journey"
+          subtitle="Your monthly tracking journey"
           icon={CalendarDays}
         />
         <div className="w-full sm:w-48">
@@ -147,6 +235,59 @@ export default function History() {
           />
         </div>
       </div>
+
+      {/* Month/Year Navigation */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
+        <GlassCard className="py-4">
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={goToPreviousMonth}
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-4 flex-1 justify-center">
+              <div className="text-center">
+                <div className="flex items-center gap-2 justify-center">
+                  <Calendar className="w-5 h-5 text-purple-400" />
+                  <h3 className="text-xl sm:text-2xl font-bold text-white">
+                    {monthNames[selectedMonth]} {selectedYear}
+                  </h3>
+                </div>
+                <p className="text-white/40 text-xs sm:text-sm mt-1">
+                  {daysInMonth} days in this month
+                </p>
+              </div>
+
+              {!isCurrentMonth && (
+                <button
+                  onClick={goToCurrentMonth}
+                  className="px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-sm transition-all border border-purple-500/30"
+                >
+                  Today
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={goToNextMonth}
+              disabled={isCurrentMonth}
+              className={`p-2 rounded-lg transition-all ${
+                isCurrentMonth
+                  ? 'bg-white/5 text-white/30 cursor-not-allowed'
+                  : 'bg-white/5 hover:bg-white/10 text-white/70 hover:text-white'
+              }`}
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </GlassCard>
+      </motion.div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -188,7 +329,7 @@ export default function History() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-purple-400" />
-              Last 30 Days
+              {monthNames[selectedMonth]} {selectedYear}
             </h2>
             {hoveredDay && (
               <motion.div
@@ -222,19 +363,20 @@ export default function History() {
 
               {/* Calendar Days */}
               <div className="grid grid-cols-7 gap-2">
-                {/* Empty cells for alignment - based on first day of oldest date */}
-                {history.length > 0 &&
-                  Array.from({
-                    length: new Date(history[history.length - 1].date + 'T00:00:00').getDay(),
-                  }).map((_, i) => (
-                    <div key={`empty-${i}`} className="w-11 h-11 sm:w-14 sm:h-14" />
-                  ))}
+                {calendarDays.map((day, index) => {
+                  if (!day) {
+                    // Empty cell before the 1st of the month
+                    return <div key={`empty-${index}`} className="w-11 h-11 sm:w-14 sm:h-14" />
+                  }
 
-                {/* Day cells */}
-                {[...history].reverse().map((day, index) => {
                   const date = new Date(day.date + 'T00:00:00')
-                  const isToday = day.date === new Date().toISOString().split('T')[0]
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const dayDate = new Date(day.date + 'T00:00:00')
+                  dayDate.setHours(0, 0, 0, 0)
+                  const isToday = dayDate.getTime() === today.getTime()
                   const sectionCount = day.completed_sections.length
+                  const isFutureDate = dayDate > today
 
                   return (
                     <motion.div
@@ -242,11 +384,12 @@ export default function History() {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.3 + index * 0.01 }}
-                      onMouseEnter={() => setHoveredDay(day)}
+                      onMouseEnter={() => !isFutureDate && setHoveredDay(day)}
                       onMouseLeave={() => setHoveredDay(null)}
-                      onClick={() => setHoveredDay(hoveredDay?.date === day.date ? null : day)}
+                      onClick={() => !isFutureDate && setHoveredDay(hoveredDay?.date === day.date ? null : day)}
                       className={`
-                        w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
+                        w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex flex-col items-center justify-center transition-all
+                        ${isFutureDate ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
                         ${
                           day.is_complete
                             ? 'bg-gradient-to-br from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30'
@@ -269,19 +412,21 @@ export default function History() {
                       </span>
 
                       {/* Section count */}
-                      <span
-                        className={`text-[10px] sm:text-xs font-semibold ${
-                          sectionCount === 3
-                            ? 'text-emerald-100'
-                            : sectionCount === 2
-                            ? 'text-amber-100'
-                            : sectionCount === 1
-                            ? 'text-amber-200/80'
-                            : 'text-white/30'
-                        }`}
-                      >
-                        {sectionCount}/3
-                      </span>
+                      {!isFutureDate && (
+                        <span
+                          className={`text-[10px] sm:text-xs font-semibold ${
+                            sectionCount === 3
+                              ? 'text-emerald-100'
+                              : sectionCount === 2
+                              ? 'text-amber-100'
+                              : sectionCount === 1
+                              ? 'text-amber-200/80'
+                              : 'text-white/30'
+                          }`}
+                        >
+                          {sectionCount}/3
+                        </span>
+                      )}
                     </motion.div>
                   )
                 })}
