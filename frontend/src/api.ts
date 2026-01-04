@@ -204,6 +204,12 @@ export const api = {
       body: { name },
     }),
 
+  updateGroup: (groupId: number, name: string) =>
+    request<{ id: number; name: string; owner_id: number; is_owner: boolean }>(`/groups/${groupId}`, {
+      method: 'PUT',
+      body: { name },
+    }),
+
   getMembers: (groupId: number) =>
     request<{ id: number; user_id: number; name: string; email: string }[]>(`/groups/${groupId}/members`),
 
@@ -215,6 +221,15 @@ export const api = {
 
   removeMember: (groupId: number, userId: number) =>
     request<{ message: string }>(`/groups/${groupId}/members/${userId}`, { method: 'DELETE' }),
+
+  transferOwnership: (groupId: number, newOwnerId: number) =>
+    request<{ message: string; group: { id: number; name: string; owner_id: number; is_owner: boolean } }>(
+      `/groups/${groupId}/owner`,
+      {
+        method: 'PUT',
+        body: { new_owner_id: newOwnerId },
+      }
+    ),
 
   // Entries
   getEntries: (groupId: number, date?: string) => {

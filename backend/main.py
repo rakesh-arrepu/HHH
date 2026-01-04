@@ -166,6 +166,20 @@ class GroupResponse(BaseModel):
     is_owner: bool = False
 
 
+class GroupUpdate(BaseModel):
+    name: str
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError('Group name is required')
+        if len(v) > MAX_GROUP_NAME_LENGTH:
+            raise ValueError(f'Group name must be less than {MAX_GROUP_NAME_LENGTH} characters')
+        return v
+
+
 class MemberAdd(BaseModel):
     email: EmailStr
 
@@ -175,6 +189,10 @@ class MemberResponse(BaseModel):
     user_id: int
     name: str
     email: str
+
+
+class TransferOwnershipRequest(BaseModel):
+    new_owner_id: int
 
 
 class EntryCreate(BaseModel):
@@ -496,6 +514,48 @@ def create_group(
         raise HTTPException(status_code=500, detail="Failed to create group. Please try again.")
 
 
+@app.put("/api/groups/{group_id}", response_model=GroupResponse)
+def update_group(
+    group_id: int,
+    group_data: GroupUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update a group's name. Only the owner can update.
+
+    Returns:
+        GroupResponse with the updated group
+
+    Errors:
+        400: Validation error (empty name, etc.)
+        401: Not authenticated
+        403: Only owner can update group
+        404: Group not found
+        500: Database error
+    """
+    try:
+        group = db.query(Group).filter(Group.id == group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        # Only owner can update group
+        if group.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Only the group owner can update the group")
+
+        # Update group name
+        group.name = group_data.name.strip()  # type: ignore[assignment]
+        db.commit()
+        db.refresh(group)
+
+        return GroupResponse(id=cast(int, group.id), name=cast(str, group.name), owner_id=cast(int, group.owner_id), is_owner=True)
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update group. Please try again.")
+
+
 @app.get("/api/groups/{group_id}/members", response_model=list[MemberResponse])
 def list_members(
     group_id: int,
@@ -645,6 +705,78 @@ def remove_member(
     except SQLAlchemyError:
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to remove member. Please try again.")
+
+@app.put("/api/groups/{group_id}/owner")
+def transfer_ownership(
+    group_id: int,
+    request: TransferOwnershipRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Transfer group ownership to another member.
+
+    Args:
+        group_id: The group to transfer
+        new_owner_id: The user ID of the new owner (must be a member)
+
+    Returns:
+        Success message with updated group info
+
+    Errors:
+        400: New owner is not a member or is already the owner
+        401: Not authenticated
+        403: Only current owner can transfer ownership
+        404: Group not found
+        500: Database error
+    """
+    try:
+        group = db.query(Group).filter(Group.id == group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        # Only current owner can transfer
+        if group.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Only the current owner can transfer ownership")
+
+        # Cannot transfer to yourself
+        if request.new_owner_id == current_user.id:
+            raise HTTPException(status_code=400, detail="You are already the owner of this group")
+
+        # Verify new owner is a member
+        is_member = db.query(GroupMember).filter(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == request.new_owner_id
+        ).first()
+
+        if not is_member:
+            raise HTTPException(status_code=400, detail="New owner must be a member of the group")
+
+        # Get new owner user info for response
+        new_owner = db.query(User).filter(User.id == request.new_owner_id).first()
+        if not new_owner:
+            raise HTTPException(status_code=404, detail="New owner user not found")
+
+        # Transfer ownership
+        group.owner_id = request.new_owner_id  # type: ignore[assignment]
+        db.commit()
+        db.refresh(group)
+
+        return {
+            "message": f"Ownership transferred successfully to {new_owner.name}",
+            "group": GroupResponse(
+                id=cast(int, group.id),
+                name=cast(str, group.name),
+                owner_id=cast(int, group.owner_id),
+                is_owner=False  # Current user is no longer owner
+            )
+        }
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to transfer ownership. Please try again.")
+
 
 # ============== Entry Endpoints ==============
 
