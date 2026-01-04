@@ -15,7 +15,9 @@ import {
   Crown,
   Medal,
   Award,
-  Zap
+  Zap,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import {
   GlassCard,
@@ -38,6 +40,15 @@ export default function Analytics() {
   const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
 
+  // Month/Year picker state
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()) // 0-11
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ]
+
   useEffect(() => {
     loadGroups()
   }, [])
@@ -46,7 +57,7 @@ export default function Analytics() {
     if (selectedGroup) {
       loadGroupData()
     }
-  }, [selectedGroup])
+  }, [selectedGroup, selectedMonth, selectedYear])
 
   const loadGroups = async () => {
     try {
@@ -64,18 +75,59 @@ export default function Analytics() {
 
   const loadGroupData = async () => {
     if (!selectedGroup) return
+
+    // Calculate days in selected month
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate()
+
     try {
       const [membersData, historyData, streakData] = await Promise.all([
         api.getMembers(selectedGroup),
-        api.getHistory(selectedGroup, 30),
+        api.getHistory(selectedGroup, daysInMonth),
         api.getStreak(selectedGroup),
       ])
       setMembers(membersData)
-      setHistory(historyData)
+
+      // Filter history to only include dates from selected month
+      const filteredHistory = historyData.filter(day => {
+        const dayDate = new Date(day.date)
+        return dayDate.getMonth() === selectedMonth && dayDate.getFullYear() === selectedYear
+      })
+
+      setHistory(filteredHistory)
       setStreak(streakData.streak)
     } catch (err) {
       console.error('Failed to load group data:', err)
     }
+  }
+
+  const goToPreviousMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11)
+      setSelectedYear(selectedYear - 1)
+    } else {
+      setSelectedMonth(selectedMonth - 1)
+    }
+  }
+
+  const goToNextMonth = () => {
+    const currentDate = new Date()
+    const isCurrentMonth = selectedMonth === currentDate.getMonth() && selectedYear === currentDate.getFullYear()
+
+    // Don't allow going to future months
+    if (isCurrentMonth) return
+
+    if (selectedMonth === 11) {
+      setSelectedMonth(0)
+      setSelectedYear(selectedYear + 1)
+    } else {
+      setSelectedMonth(selectedMonth + 1)
+    }
+  }
+
+  const goToCurrentMonth = () => {
+    const now = new Date()
+    setSelectedMonth(now.getMonth())
+    setSelectedYear(now.getFullYear())
   }
 
   if (loading) {
@@ -100,10 +152,15 @@ export default function Analytics() {
 
   const groupOptions = groups.map((g) => ({ value: g.id, label: g.name }))
 
+  // Calculate days in the selected month
+  const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate()
+  const currentDate = new Date()
+  const isCurrentMonth = selectedMonth === currentDate.getMonth() && selectedYear === currentDate.getFullYear()
+
   // Calculate group-level stats
   const completeDays = history.filter((d) => d.is_complete).length
-  const totalDays = 30
-  const completionRate = Math.round((completeDays / totalDays) * 100)
+  const totalDays = daysInMonth
+  const completionRate = totalDays > 0 ? Math.round((completeDays / totalDays) * 100) : 0
   const avgSectionsPerDay =
     history.length > 0
       ? (
@@ -185,6 +242,59 @@ export default function Analytics() {
         </div>
       </div>
 
+      {/* Month/Year Picker */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
+        <GlassCard className="py-4">
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={goToPreviousMonth}
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-4 flex-1 justify-center">
+              <div className="text-center">
+                <div className="flex items-center gap-2 justify-center">
+                  <Calendar className="w-5 h-5 text-purple-400" />
+                  <h3 className="text-xl sm:text-2xl font-bold text-white">
+                    {monthNames[selectedMonth]} {selectedYear}
+                  </h3>
+                </div>
+                <p className="text-white/40 text-xs sm:text-sm mt-1">
+                  {daysInMonth} days in this month
+                </p>
+              </div>
+
+              {!isCurrentMonth && (
+                <button
+                  onClick={goToCurrentMonth}
+                  className="px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-sm transition-all border border-purple-500/30"
+                >
+                  Today
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={goToNextMonth}
+              disabled={isCurrentMonth}
+              className={`p-2 rounded-lg transition-all ${
+                isCurrentMonth
+                  ? 'bg-white/5 text-white/30 cursor-not-allowed'
+                  : 'bg-white/5 hover:bg-white/10 text-white/70 hover:text-white'
+              }`}
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </GlassCard>
+      </motion.div>
+
       {/* Key Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <motion.div
@@ -254,7 +364,7 @@ export default function Analytics() {
         <GlassCard>
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-purple-400" />
-            Section Breakdown (30 Days)
+            Section Breakdown ({monthNames[selectedMonth]})
           </h3>
           <div className="space-y-4">
             {sectionStats.map((section) => {
