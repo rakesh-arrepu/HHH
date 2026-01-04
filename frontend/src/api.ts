@@ -216,6 +216,15 @@ export const api = {
   removeMember: (groupId: number, userId: number) =>
     request<{ message: string }>(`/groups/${groupId}/members/${userId}`, { method: 'DELETE' }),
 
+  transferOwnership: (groupId: number, newOwnerId: number) =>
+    request<{ message: string; group: { id: number; name: string; owner_id: number; is_owner: boolean } }>(
+      `/groups/${groupId}/owner`,
+      {
+        method: 'PUT',
+        body: { new_owner_id: newOwnerId },
+      }
+    ),
+
   // Entries
   getEntries: (groupId: number, date?: string) => {
     const params = new URLSearchParams({ group_id: String(groupId) })

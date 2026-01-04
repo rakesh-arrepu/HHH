@@ -9,7 +9,8 @@ import {
   UserPlus,
   UserMinus,
   Sparkles,
-  UsersRound
+  UsersRound,
+  ArrowRightLeft
 } from 'lucide-react'
 import {
   GlassCard,
@@ -36,6 +37,8 @@ export default function Groups() {
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
 
   useEffect(() => {
     loadGroups()
@@ -115,6 +118,42 @@ export default function Groups() {
       setMembers(members.filter((m) => m.user_id !== userId))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove member')
+    }
+  }
+
+  const transferOwnership = async (newOwnerId: number) => {
+    if (!selectedGroup) return
+
+    const newOwner = members.find((m) => m.user_id === newOwnerId)
+    if (!newOwner) return
+
+    if (!confirm(`Are you sure you want to transfer ownership to ${newOwner.name}? This action cannot be undone.`)) {
+      return
+    }
+
+    setError('')
+    setTransferring(true)
+    try {
+      await api.transferOwnership(selectedGroup.id, newOwnerId)
+
+      // Update groups list
+      setGroups(groups.map(g =>
+        g.id === selectedGroup.id
+          ? { ...g, owner_id: newOwnerId, is_owner: false }
+          : g
+      ))
+
+      // Update selected group
+      setSelectedGroup({ ...selectedGroup, owner_id: newOwnerId, is_owner: false })
+
+      setShowTransferModal(false)
+
+      // Show success message
+      alert(`Ownership successfully transferred to ${newOwner.name}!`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to transfer ownership')
+    } finally {
+      setTransferring(false)
     }
   }
 
@@ -299,16 +338,27 @@ export default function Groups() {
                               <div className="text-sm text-white/50">{member.email}</div>
                             </div>
                           </div>
-                          {selectedGroup.is_owner &&
-                            member.user_id !== selectedGroup.owner_id && (
-                              <IconButton
-                                icon={UserMinus}
-                                variant="danger"
-                                size="sm"
-                                tooltip="Remove member"
-                                onClick={() => removeMember(member.user_id)}
-                              />
-                            )}
+                          <div className="flex items-center gap-2">
+                            {selectedGroup.is_owner &&
+                              member.user_id !== selectedGroup.owner_id && (
+                                <>
+                                  <IconButton
+                                    icon={ArrowRightLeft}
+                                    variant="warning"
+                                    size="sm"
+                                    tooltip="Transfer ownership"
+                                    onClick={() => transferOwnership(member.user_id)}
+                                  />
+                                  <IconButton
+                                    icon={UserMinus}
+                                    variant="danger"
+                                    size="sm"
+                                    tooltip="Remove member"
+                                    onClick={() => removeMember(member.user_id)}
+                                  />
+                                </>
+                              )}
+                          </div>
                         </motion.div>
                       ))}
                     </div>

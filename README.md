@@ -28,6 +28,7 @@ Open http://localhost:5173 in your browser.
 
 - **Daily Entries**: Track 3 sections (Health, Happiness, Hela) each day
 - **Groups**: Create groups and invite members to track together
+- **Group Ownership**: Each group has exactly one owner who can manage members and transfer ownership
 - **Streak Counter**: Counts consecutive days with all 3 sections completed
 - **History**: View past 30 days with completion calendar
 
@@ -52,6 +53,7 @@ Open http://localhost:5173 in your browser.
 | GET | /api/groups/:id/members | List members |
 | POST | /api/groups/:id/members | Add member |
 | DELETE | /api/groups/:id/members/:uid | Remove member |
+| PUT | /api/groups/:id/owner | Transfer ownership |
 | GET | /api/entries | Get entries |
 | POST | /api/entries | Create/update entry |
 | GET | /api/analytics/streak | Get streak |
