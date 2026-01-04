@@ -204,6 +204,12 @@ export const api = {
       body: { name },
     }),
 
+  updateGroup: (groupId: number, name: string) =>
+    request<{ id: number; name: string; owner_id: number; is_owner: boolean }>(`/groups/${groupId}`, {
+      method: 'PUT',
+      body: { name },
+    }),
+
   getMembers: (groupId: number) =>
     request<{ id: number; user_id: number; name: string; email: string }[]>(`/groups/${groupId}/members`),
 

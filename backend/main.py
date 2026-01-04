@@ -166,6 +166,20 @@ class GroupResponse(BaseModel):
     is_owner: bool = False
 
 
+class GroupUpdate(BaseModel):
+    name: str
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError('Group name is required')
+        if len(v) > MAX_GROUP_NAME_LENGTH:
+            raise ValueError(f'Group name must be less than {MAX_GROUP_NAME_LENGTH} characters')
+        return v
+
+
 class MemberAdd(BaseModel):
     email: EmailStr
 
@@ -498,6 +512,48 @@ def create_group(
     except SQLAlchemyError:
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create group. Please try again.")
+
+
+@app.put("/api/groups/{group_id}", response_model=GroupResponse)
+def update_group(
+    group_id: int,
+    group_data: GroupUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update a group's name. Only the owner can update.
+
+    Returns:
+        GroupResponse with the updated group
+
+    Errors:
+        400: Validation error (empty name, etc.)
+        401: Not authenticated
+        403: Only owner can update group
+        404: Group not found
+        500: Database error
+    """
+    try:
+        group = db.query(Group).filter(Group.id == group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        # Only owner can update group
+        if group.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Only the group owner can update the group")
+
+        # Update group name
+        group.name = group_data.name.strip()  # type: ignore[assignment]
+        db.commit()
+        db.refresh(group)
+
+        return GroupResponse(id=cast(int, group.id), name=cast(str, group.name), owner_id=cast(int, group.owner_id), is_owner=True)
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update group. Please try again.")
 
 
 @app.get("/api/groups/{group_id}/members", response_model=list[MemberResponse])

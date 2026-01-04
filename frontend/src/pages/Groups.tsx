@@ -10,7 +10,10 @@ import {
   UserMinus,
   Sparkles,
   UsersRound,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Edit2,
+  Check,
+  X
 } from 'lucide-react'
 import {
   GlassCard,
@@ -39,6 +42,9 @@ export default function Groups() {
   const [adding, setAdding] = useState(false)
   const [transferring, setTransferring] = useState(false)
   const [showTransferModal, setShowTransferModal] = useState(false)
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null)
+  const [editingGroupName, setEditingGroupName] = useState('')
+  const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
     loadGroups()
@@ -157,6 +163,46 @@ export default function Groups() {
     }
   }
 
+  const startEditingGroup = (group: Group) => {
+    setEditingGroupId(group.id)
+    setEditingGroupName(group.name)
+    setError('')
+  }
+
+  const cancelEditingGroup = () => {
+    setEditingGroupId(null)
+    setEditingGroupName('')
+    setError('')
+  }
+
+  const updateGroupName = async (groupId: number) => {
+    if (!editingGroupName.trim()) {
+      setError('Group name cannot be empty')
+      return
+    }
+
+    setError('')
+    setUpdating(true)
+    try {
+      const updatedGroup = await api.updateGroup(groupId, editingGroupName.trim())
+
+      // Update groups list
+      setGroups(groups.map(g => g.id === groupId ? updatedGroup : g))
+
+      // Update selected group if it's the one being edited
+      if (selectedGroup && selectedGroup.id === groupId) {
+        setSelectedGroup({ ...selectedGroup, name: updatedGroup.name })
+      }
+
+      setEditingGroupId(null)
+      setEditingGroupName('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update group name')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   if (loading) {
     return (
       <PageContainer className="flex items-center justify-center min-h-[60vh]">
@@ -201,50 +247,96 @@ export default function Groups() {
               ) : (
                 <div className="space-y-2">
                   {groups.map((group, index) => (
-                    <motion.button
+                    <motion.div
                       key={group.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      onClick={() => setSelectedGroup(group)}
-                      className={`w-full p-4 rounded-xl text-left transition-all duration-300 flex items-center justify-between group ${
+                      className={`w-full p-4 rounded-xl transition-all duration-300 border ${
                         selectedGroup?.id === group.id
-                          ? 'bg-purple-500/20 border border-purple-500/30'
-                          : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
+                          ? 'bg-purple-500/20 border-purple-500/30'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                            selectedGroup?.id === group.id
-                              ? 'bg-purple-500/30'
-                              : 'bg-white/10 group-hover:bg-white/15'
-                          }`}
-                        >
-                          <Sparkles
-                            className={`w-5 h-5 ${
-                              selectedGroup?.id === group.id
-                                ? 'text-purple-400'
-                                : 'text-white/50 group-hover:text-white/70'
-                            }`}
+                      {editingGroupId === group.id ? (
+                        <div className="flex items-center gap-2">
+                          <InputField
+                            type="text"
+                            value={editingGroupName}
+                            onChange={(e) => setEditingGroupName(e.target.value)}
+                            placeholder="Group name"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') updateGroupName(group.id)
+                              if (e.key === 'Escape') cancelEditingGroup()
+                            }}
+                          />
+                          <IconButton
+                            icon={Check}
+                            variant="success"
+                            size="sm"
+                            onClick={() => updateGroupName(group.id)}
+                            disabled={updating}
+                          />
+                          <IconButton
+                            icon={X}
+                            variant="danger"
+                            size="sm"
+                            onClick={cancelEditingGroup}
+                            disabled={updating}
                           />
                         </div>
-                        <span
-                          className={`font-medium ${
-                            selectedGroup?.id === group.id
-                              ? 'text-white'
-                              : 'text-white/80 group-hover:text-white'
-                          }`}
+                      ) : (
+                        <button
+                          onClick={() => setSelectedGroup(group)}
+                          className="w-full flex items-center justify-between group"
                         >
-                          {group.name}
-                        </span>
-                      </div>
-                      {group.is_owner && (
-                        <Badge variant="owner" icon={Crown}>
-                          Owner
-                        </Badge>
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                selectedGroup?.id === group.id
+                                  ? 'bg-purple-500/30'
+                                  : 'bg-white/10 group-hover:bg-white/15'
+                              }`}
+                            >
+                              <Sparkles
+                                className={`w-5 h-5 ${
+                                  selectedGroup?.id === group.id
+                                    ? 'text-purple-400'
+                                    : 'text-white/50 group-hover:text-white/70'
+                                }`}
+                              />
+                            </div>
+                            <span
+                              className={`font-medium ${
+                                selectedGroup?.id === group.id
+                                  ? 'text-white'
+                                  : 'text-white/80 group-hover:text-white'
+                              }`}
+                            >
+                              {group.name}
+                            </span>
+                            {group.is_owner && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  startEditingGroup(group)
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-white/10 transition-all"
+                                title="Rename group"
+                              >
+                                <Edit2 className="w-4 h-4 text-white/60 hover:text-white" />
+                              </button>
+                            )}
+                          </div>
+                          {group.is_owner && (
+                            <Badge variant="owner" icon={Crown}>
+                              Owner
+                            </Badge>
+                          )}
+                        </button>
                       )}
-                    </motion.button>
+                    </motion.div>
                   ))}
                 </div>
               )}
