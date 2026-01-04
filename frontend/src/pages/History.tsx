@@ -346,27 +346,44 @@ export default function History() {
             )}
           </div>
 
-          {/* Calendar Grid - Properly Centered */}
+          {/* Calendar Grid - Enhanced with Borders */}
           <div className="flex justify-center">
             <div className="inline-block">
-              {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-2 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              {/* Day Headers with Border */}
+              <div className="grid grid-cols-7 border-b-2 border-white/20 mb-3 pb-2">
+                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, idx) => (
                   <div
                     key={day}
-                    className="w-11 h-8 sm:w-14 sm:h-10 flex items-center justify-center text-xs sm:text-sm text-white/50 font-medium"
+                    className={`
+                      w-12 h-10 sm:w-16 sm:h-12 flex items-center justify-center text-xs sm:text-sm font-bold
+                      ${idx === 0 || idx === 6 ? 'text-purple-400' : 'text-white/70'}
+                      ${idx !== 6 ? 'border-r border-white/10' : ''}
+                    `}
                   >
-                    {day.substring(0, 2)}
+                    <span className="hidden sm:inline">{day.substring(0, 3)}</span>
+                    <span className="sm:hidden">{day.substring(0, 2)}</span>
                   </div>
                 ))}
               </div>
 
-              {/* Calendar Days */}
-              <div className="grid grid-cols-7 gap-2">
+              {/* Calendar Days with Grid Borders */}
+              <div className="grid grid-cols-7 border-2 border-white/20 rounded-lg overflow-hidden bg-white/5 backdrop-blur-sm">
                 {calendarDays.map((day, index) => {
+                  const isLastColumn = (index + 1) % 7 === 0
+                  const isLastRow = index >= calendarDays.length - 7
+
                   if (!day) {
                     // Empty cell before the 1st of the month
-                    return <div key={`empty-${index}`} className="w-11 h-11 sm:w-14 sm:h-14" />
+                    return (
+                      <div
+                        key={`empty-${index}`}
+                        className={`
+                          w-12 h-12 sm:w-16 sm:h-16 bg-white/5
+                          ${!isLastColumn ? 'border-r border-white/10' : ''}
+                          ${!isLastRow ? 'border-b border-white/10' : ''}
+                        `}
+                      />
+                    )
                   }
 
                   const date = new Date(day.date + 'T00:00:00')
@@ -377,6 +394,7 @@ export default function History() {
                   const isToday = dayDate.getTime() === today.getTime()
                   const sectionCount = day.completed_sections.length
                   const isFutureDate = dayDate > today
+                  const isWeekend = date.getDay() === 0 || date.getDay() === 6
 
                   return (
                     <motion.div
@@ -388,44 +406,84 @@ export default function History() {
                       onMouseLeave={() => setHoveredDay(null)}
                       onClick={() => !isFutureDate && setHoveredDay(hoveredDay?.date === day.date ? null : day)}
                       className={`
-                        w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex flex-col items-center justify-center transition-all
-                        ${isFutureDate ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
-                        ${
-                          day.is_complete
-                            ? 'bg-gradient-to-br from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30'
-                            : sectionCount === 2
-                            ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-lg shadow-amber-500/20'
-                            : sectionCount === 1
-                            ? 'bg-gradient-to-br from-amber-500/50 to-orange-500/50'
-                            : 'bg-white/5 hover:bg-white/10'
-                        }
-                        ${isToday ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-[#0f0f1a]' : ''}
+                        relative w-12 h-12 sm:w-16 sm:h-16 flex flex-col items-center justify-center transition-all duration-300
+                        ${!isLastColumn ? 'border-r border-white/10' : ''}
+                        ${!isLastRow ? 'border-b border-white/10' : ''}
+                        ${isFutureDate ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:scale-105 hover:z-10'}
+                        ${isWeekend ? 'bg-purple-500/5' : 'bg-transparent'}
                       `}
                     >
-                      {/* Date number */}
-                      <span
-                        className={`text-sm sm:text-base font-bold ${
-                          sectionCount > 0 ? 'text-white' : 'text-white/50'
-                        }`}
-                      >
-                        {date.getDate()}
-                      </span>
+                      {/* Background gradient based on completion */}
+                      <div className={`
+                        absolute inset-0 transition-all duration-300
+                        ${
+                          day.is_complete
+                            ? 'bg-gradient-to-br from-emerald-500/90 to-teal-500/90'
+                            : sectionCount === 2
+                            ? 'bg-gradient-to-br from-amber-500/80 to-orange-500/80'
+                            : sectionCount === 1
+                            ? 'bg-gradient-to-br from-amber-500/40 to-orange-500/40'
+                            : 'bg-transparent hover:bg-white/10'
+                        }
+                      `} />
 
-                      {/* Section count */}
-                      {!isFutureDate && (
+                      {/* Enhanced shadow effects */}
+                      <div className={`
+                        absolute inset-0 transition-all duration-300
+                        ${
+                          day.is_complete
+                            ? 'shadow-[inset_0_2px_8px_rgba(16,185,129,0.3),0_4px_12px_rgba(16,185,129,0.4)]'
+                            : sectionCount === 2
+                            ? 'shadow-[inset_0_2px_8px_rgba(245,158,11,0.2),0_4px_12px_rgba(245,158,11,0.3)]'
+                            : sectionCount === 1
+                            ? 'shadow-[inset_0_2px_6px_rgba(245,158,11,0.15)]'
+                            : 'shadow-inner'
+                        }
+                      `} />
+
+                      {/* Today indicator */}
+                      {isToday && (
+                        <div className="absolute inset-0 border-2 border-purple-400 rounded-sm animate-pulse" />
+                      )}
+
+                      {/* Content */}
+                      <div className="relative z-10 flex flex-col items-center justify-center">
+                        {/* Date number */}
                         <span
-                          className={`text-[10px] sm:text-xs font-semibold ${
-                            sectionCount === 3
-                              ? 'text-emerald-100'
-                              : sectionCount === 2
-                              ? 'text-amber-100'
-                              : sectionCount === 1
-                              ? 'text-amber-200/80'
-                              : 'text-white/30'
+                          className={`text-sm sm:text-lg font-bold transition-all ${
+                            sectionCount > 0 ? 'text-white drop-shadow-lg' : 'text-white/60'
                           }`}
                         >
-                          {sectionCount}/3
+                          {date.getDate()}
                         </span>
+
+                        {/* Section count indicator */}
+                        {!isFutureDate && (
+                          <div className="flex items-center gap-0.5 mt-0.5">
+                            {[1, 2, 3].map((dot) => (
+                              <div
+                                key={dot}
+                                className={`
+                                  w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full transition-all
+                                  ${
+                                    dot <= sectionCount
+                                      ? sectionCount === 3
+                                        ? 'bg-emerald-100 shadow-sm shadow-emerald-300'
+                                        : sectionCount === 2
+                                        ? 'bg-amber-100 shadow-sm shadow-amber-300'
+                                        : 'bg-amber-200 shadow-sm shadow-amber-300'
+                                      : 'bg-white/20'
+                                  }
+                                `}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Hover overlay effect */}
+                      {!isFutureDate && (
+                        <div className="absolute inset-0 bg-white/0 hover:bg-white/10 transition-all duration-300" />
                       )}
                     </motion.div>
                   )
