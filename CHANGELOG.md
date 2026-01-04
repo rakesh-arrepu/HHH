@@ -16,6 +16,7 @@ All notable changes to the HHH Daily Tracker project will be documented in this 
 - Cookies still set for local development but token-based auth is primary method
 - **This is the industry standard for cross-origin authentication in 2026** - eliminates all cross-site cookie issues
 - Works reliably across ALL browsers (Chrome, Safari, Firefox, Edge) on ALL devices (desktop, tablet, mobile)
+- **See [Authentication Guide](docs/AUTHENTICATION_GUIDE.md) for complete documentation**
 
 #### UI Alignment & Layout Fixes
 
