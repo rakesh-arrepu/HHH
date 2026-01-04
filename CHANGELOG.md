@@ -8,12 +8,12 @@ All notable changes to the HHH Daily Tracker project will be documented in this 
 
 #### Production Cross-Site Cookie Fix 🔒
 
-- **CRITICAL**: Fixed Safari/Chrome cross-site cookie issue preventing authentication in production
-- Added `set_session_cookie()` helper function with Partitioned attribute support
+- **CRITICAL**: Fixed production login 500 error and cross-site cookie authentication
+- Added `set_session_cookie()` helper function for consistent cookie handling
+- Simplified cookie implementation to use standard attributes (SameSite=None, Secure, HttpOnly, Path=/)
+- Removed Partitioned attribute that was causing 500 errors in production
 - Ensures cookies work properly between GitHub Pages frontend and Render backend
-- Added explicit `path="/"` for cookie consistency
-- Partitioned attribute enables CHIPS (Cookies Having Independent Partitioned State) support
-- Fixes 401 Unauthorized errors when accessing API endpoints after login in production
+- Fixes 401 Unauthorized and 500 errors when accessing API endpoints after login in production
 
 #### UI Alignment & Layout Fixes
 

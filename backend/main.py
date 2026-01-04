@@ -39,10 +39,9 @@ def set_session_cookie(response: Response, token: str) -> None:
     For production (cross-site), we need:
     - SameSite=None (allow cross-site)
     - Secure=true (required with SameSite=None)
-    - Partitioned (for Safari/Chrome CHIPS support)
     - HttpOnly (security - no JS access)
+    - Path=/ (available across entire domain)
     """
-    # Use standard set_cookie method
     response.set_cookie(
         key="session",
         value=token,
@@ -52,15 +51,6 @@ def set_session_cookie(response: Response, token: str) -> None:
         max_age=60 * 60 * 24 * 7,  # 7 days
         path="/"
     )
-
-    # For production cross-site cookies, manually add Partitioned attribute
-    # This is required for Safari and Chrome to properly handle third-party cookies
-    if is_production and COOKIE_SAMESITE == 'none':
-        # Get the existing Set-Cookie header
-        existing_cookie = response.headers.get("set-cookie", "")
-        if existing_cookie and "Partitioned" not in existing_cookie:
-            # Append Partitioned attribute
-            response.headers["set-cookie"] = existing_cookie.rstrip(";") + "; Partitioned"
 
 
 # Create tables
