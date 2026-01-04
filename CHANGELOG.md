@@ -17,7 +17,7 @@ All notable changes to the HHH Daily Tracker project will be documented in this 
 
 #### UI Alignment & Layout Fixes
 
-- Added "Group" label to dropdown in History page for proper alignment with "View Data As" selector
+- Added "Group" label to all group dropdowns (Journal, History, Analytics) for consistent alignment
 - Fixed streak position in Journal page - now properly aligned to the right side
 - Removed `flex-1` from dropdowns to prevent layout shifting
 - Added `ml-auto` class to streak component for right alignment
@@ -26,7 +26,8 @@ All notable changes to the HHH Daily Tracker project will be documented in this 
 
 - [backend/main.py](backend/main.py): Added `set_session_cookie()` helper, updated register/login endpoints
 - [frontend/src/pages/History.tsx](frontend/src/pages/History.tsx): Added "Group" label to SelectField
-- [frontend/src/pages/Journal.tsx](frontend/src/pages/Journal.tsx): Fixed streak positioning with `ml-auto`
+- [frontend/src/pages/Journal.tsx](frontend/src/pages/Journal.tsx): Added "Group" label, fixed streak positioning with `ml-auto`
+- [frontend/src/pages/Analytics.tsx](frontend/src/pages/Analytics.tsx): Added "Group" label to SelectField
 
 ## [Session: 2026-01-04] - Owner Data Visibility Feature
 

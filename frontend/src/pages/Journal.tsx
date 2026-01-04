@@ -308,6 +308,7 @@ export default function Journal() {
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
         <div className="max-w-[200px]">
           <SelectField
+            label="Group"
             options={groupOptions}
             value={selectedGroup || ''}
             onChange={(e) => setSelectedGroup(Number(e.target.value))}
