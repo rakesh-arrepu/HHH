@@ -98,13 +98,36 @@ export function onAuthEvent(callback: AuthEventCallback): () => void {
   }
 }
 
+// ============== Token Storage ==============
+const TOKEN_KEY = 'auth_token'
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  // Add Authorization header if token exists
+  const token = getToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const config: RequestInit = {
     method: options.method || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
+    headers,
+    credentials: 'include', // Keep for backward compatibility with local dev
   }
 
   if (options.body) {
@@ -166,13 +189,28 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 // Auth
 export const api = {
   // Auth
-  register: (data: { email: string; password: string; name: string }) =>
-    request<{ id: number; email: string; name: string }>('/auth/register', { method: 'POST', body: data }),
+  register: async (data: { email: string; password: string; name: string }) => {
+    const response = await request<{ id: number; email: string; name: string; token: string }>('/auth/register', { method: 'POST', body: data })
+    // Store token for cross-origin auth
+    if (response.token) {
+      setToken(response.token)
+    }
+    return response
+  },
 
-  login: (data: { email: string; password: string }) =>
-    request<{ id: number; email: string; name: string }>('/auth/login', { method: 'POST', body: data }),
+  login: async (data: { email: string; password: string }) => {
+    const response = await request<{ id: number; email: string; name: string; token: string }>('/auth/login', { method: 'POST', body: data })
+    // Store token for cross-origin auth
+    if (response.token) {
+      setToken(response.token)
+    }
+    return response
+  },
 
-  logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
+  logout: () => {
+    clearToken() // Clear token from localStorage
+    return request<{ message: string }>('/auth/logout', { method: 'POST' })
+  },
 
   getMe: () => request<{ id: number; email: string; name: string }>('/auth/me'),
 
