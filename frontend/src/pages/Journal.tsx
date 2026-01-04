@@ -306,7 +306,7 @@ export default function Journal() {
     <PageContainer>
       {/* Top Bar: Group + Member Selector + Streak */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-6">
-        <div className="flex-1 max-w-[200px]">
+        <div className="max-w-[200px]">
           <SelectField
             options={groupOptions}
             value={selectedGroup || ''}
@@ -316,7 +316,7 @@ export default function Journal() {
         </div>
 
         {isOwner && members.length > 0 && (
-          <div className="flex-1 max-w-[250px]">
+          <div className="max-w-[250px]">
             <MemberSelector
               members={members}
               selectedUserId={selectedUserId}
@@ -331,7 +331,7 @@ export default function Journal() {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', bounce: 0.5, delay: 0.2 }}
-          className={`streak-fire ${completedCount >= 2 ? 'streak-success' : ''}`}
+          className={`streak-fire ml-auto ${completedCount >= 2 ? 'streak-success' : ''}`}
         >
           <Flame className={`w-5 h-5 fire-icon ${completedCount >= 2 ? 'text-emerald-400' : 'text-orange-400'}`} />
           <span className={`text-xl font-bold bg-gradient-to-r ${completedCount >= 2 ? 'from-emerald-400 via-teal-400 to-cyan-400' : 'from-orange-400 via-amber-400 to-yellow-400'} bg-clip-text text-transparent`}>

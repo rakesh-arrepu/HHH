@@ -2,7 +2,33 @@
 
 All notable changes to the HHH Daily Tracker project will be documented in this file.
 
-## [Unreleased] - 2026-01-04
+## [Unreleased] - 2026-01-05
+
+### Fixed - Production Authentication & UI Improvements
+
+#### Production Cross-Site Cookie Fix 🔒
+
+- **CRITICAL**: Fixed Safari/Chrome cross-site cookie issue preventing authentication in production
+- Added `set_session_cookie()` helper function with Partitioned attribute support
+- Ensures cookies work properly between GitHub Pages frontend and Render backend
+- Added explicit `path="/"` for cookie consistency
+- Partitioned attribute enables CHIPS (Cookies Having Independent Partitioned State) support
+- Fixes 401 Unauthorized errors when accessing API endpoints after login in production
+
+#### UI Alignment & Layout Fixes
+
+- Added "Group" label to dropdown in History page for proper alignment with "View Data As" selector
+- Fixed streak position in Journal page - now properly aligned to the right side
+- Removed `flex-1` from dropdowns to prevent layout shifting
+- Added `ml-auto` class to streak component for right alignment
+
+#### Files Modified
+
+- [backend/main.py](backend/main.py): Added `set_session_cookie()` helper, updated register/login endpoints
+- [frontend/src/pages/History.tsx](frontend/src/pages/History.tsx): Added "Group" label to SelectField
+- [frontend/src/pages/Journal.tsx](frontend/src/pages/Journal.tsx): Fixed streak positioning with `ml-auto`
+
+## [Session: 2026-01-04] - Owner Data Visibility Feature
 
 ### Added - Owner Data Visibility Feature
 

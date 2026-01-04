@@ -32,6 +32,37 @@ def verify_group_owner(db: Session, group_id: int, user_id: int) -> bool:
     return group is not None and group.owner_id == user_id
 
 
+def set_session_cookie(response: Response, token: str) -> None:
+    """
+    Set session cookie with appropriate attributes for cross-site requests.
+
+    For production (cross-site), we need:
+    - SameSite=None (allow cross-site)
+    - Secure=true (required with SameSite=None)
+    - Partitioned (for Safari/Chrome CHIPS support)
+    - HttpOnly (security - no JS access)
+    """
+    # Use standard set_cookie method
+    response.set_cookie(
+        key="session",
+        value=token,
+        httponly=True,
+        samesite=COOKIE_SAMESITE,
+        secure=COOKIE_SECURE,
+        max_age=60 * 60 * 24 * 7,  # 7 days
+        path="/"
+    )
+
+    # For production cross-site cookies, manually add Partitioned attribute
+    # This is required for Safari and Chrome to properly handle third-party cookies
+    if is_production and COOKIE_SAMESITE == 'none':
+        # Get the existing Set-Cookie header
+        existing_cookie = response.headers.get("set-cookie", "")
+        if existing_cookie and "Partitioned" not in existing_cookie:
+            # Append Partitioned attribute
+            response.headers["set-cookie"] = existing_cookie.rstrip(";") + "; Partitioned"
+
+
 # Create tables
 Base.metadata.create_all(bind=engine)
 
@@ -297,14 +328,7 @@ def register(user_data: UserCreate, response: Response, db: Session = Depends(ge
 
         # Set session cookie
         token = create_session_token(cast(int, user.id))
-        response.set_cookie(
-            key="session",
-            value=token,
-            httponly=True,
-            samesite=COOKIE_SAMESITE,
-            secure=COOKIE_SECURE,
-            max_age=60 * 60 * 24 * 7  # 7 days
-        )
+        set_session_cookie(response, token)
 
         return UserResponse(id=cast(int, user.id), email=cast(str, user.email), name=cast(str, user.name))
     except HTTPException:
@@ -332,14 +356,7 @@ def login(user_data: UserLogin, response: Response, db: Session = Depends(get_db
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         token = create_session_token(cast(int, user.id))
-        response.set_cookie(
-            key="session",
-            value=token,
-            httponly=True,
-            samesite=COOKIE_SAMESITE,
-            secure=COOKIE_SECURE,
-            max_age=60 * 60 * 24 * 7
-        )
+        set_session_cookie(response, token)
 
         return UserResponse(id=cast(int, user.id), email=cast(str, user.email), name=cast(str, user.name))
     except HTTPException:

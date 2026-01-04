@@ -264,6 +264,7 @@ export default function History() {
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <div className="w-full sm:w-48">
             <SelectField
+              label="Group"
               options={groupOptions}
               value={selectedGroup || ''}
               onChange={(e) => setSelectedGroup(Number(e.target.value))}
