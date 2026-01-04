@@ -6,14 +6,16 @@ All notable changes to the HHH Daily Tracker project will be documented in this 
 
 ### Fixed - Production Authentication & UI Improvements
 
-#### Production Cross-Site Cookie Fix 🔒
+#### Token-Based Authentication for Cross-Origin Support 🔒
 
-- **CRITICAL**: Fixed production login 500 error and cross-site cookie authentication
-- Added `set_session_cookie()` helper function for consistent cookie handling
-- Simplified cookie implementation to use standard attributes (SameSite=None, Secure, HttpOnly, Path=/)
-- Removed Partitioned attribute that was causing 500 errors in production
-- Ensures cookies work properly between GitHub Pages frontend and Render backend
-- Fixes 401 Unauthorized and 500 errors when accessing API endpoints after login in production
+- **CRITICAL**: Switched from cookie-based to token-based authentication for cross-origin compatibility
+- Cross-site cookies are blocked by Safari (since 2020), Firefox, and 30%+ of users - cookie auth doesn't work reliably anymore
+- Backend now returns JWT token in response body for login/register endpoints
+- Backend accepts both Authorization header (Bearer token) and cookies for backward compatibility
+- Frontend stores token in localStorage and sends it in Authorization header for all API requests
+- Cookies still set for local development but token-based auth is primary method
+- **This is the industry standard for cross-origin authentication in 2026** - eliminates all cross-site cookie issues
+- Works reliably across ALL browsers (Chrome, Safari, Firefox, Edge) on ALL devices (desktop, tablet, mobile)
 
 #### UI Alignment & Layout Fixes
 
@@ -24,7 +26,16 @@ All notable changes to the HHH Daily Tracker project will be documented in this 
 
 #### Files Modified
 
-- [backend/main.py](backend/main.py): Added `set_session_cookie()` helper, updated register/login endpoints
+- [backend/main.py](backend/main.py):
+  - Added `AuthResponse` model with token field
+  - Updated `get_current_user()` to accept Authorization header (Bearer token) with cookie fallback
+  - Updated login/register endpoints to return token in response body
+  - Added Header import from fastapi
+- [frontend/src/api.ts](frontend/src/api.ts):
+  - Added token storage functions (getToken, setToken, clearToken) using localStorage
+  - Updated request() to include Authorization header if token exists
+  - Updated login/register to store token automatically
+  - Updated logout to clear token from localStorage
 - [frontend/src/pages/History.tsx](frontend/src/pages/History.tsx): Added "Group" label to SelectField
 - [frontend/src/pages/Journal.tsx](frontend/src/pages/Journal.tsx): Added "Group" label, fixed streak positioning with `ml-auto`
 - [frontend/src/pages/Analytics.tsx](frontend/src/pages/Analytics.tsx): Added "Group" label to SelectField

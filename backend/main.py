@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional, Literal, cast
 import os
 import re
-from fastapi import FastAPI, Depends, HTTPException, Response, Cookie
+from fastapi import FastAPI, Depends, HTTPException, Response, Cookie, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.orm import Session
@@ -173,6 +173,14 @@ class UserResponse(BaseModel):
     name: str
 
 
+class AuthResponse(BaseModel):
+    """Response for login/register with token for cross-origin auth"""
+    id: int
+    email: str
+    name: str
+    token: str  # JWT token for Authorization header
+
+
 class GroupCreate(BaseModel):
     name: str
 
@@ -270,13 +278,27 @@ class HistoryDay(BaseModel):
 # ============== Auth Dependency ==============
 
 def get_current_user(
-    session: str = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    session: str | None = Cookie(default=None),
     db: Session = Depends(get_db)
 ) -> User:
-    if not session:
+    """
+    Get current user from Authorization header (Bearer token) or session cookie.
+    Priority: Authorization header > Cookie (for cross-origin support)
+    """
+    token = None
+
+    # Check Authorization header first (for cross-origin requests)
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.replace("Bearer ", "")
+    # Fall back to cookie (for same-origin/local dev)
+    elif session:
+        token = session
+
+    if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    user_id = verify_session_token(session)
+    user_id = verify_session_token(token)
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
@@ -288,13 +310,13 @@ def get_current_user(
 
 # ============== Auth Endpoints ==============
 
-@app.post("/api/auth/register", response_model=UserResponse)
+@app.post("/api/auth/register", response_model=AuthResponse)
 def register(user_data: UserCreate, response: Response, db: Session = Depends(get_db)):
     """
     Register a new user account.
 
     Returns:
-        UserResponse with the created user's info
+        AuthResponse with the created user's info and authentication token
 
     Errors:
         400: Email already registered, or validation error
@@ -316,11 +338,19 @@ def register(user_data: UserCreate, response: Response, db: Session = Depends(ge
         db.commit()
         db.refresh(user)
 
-        # Set session cookie
+        # Create session token
         token = create_session_token(cast(int, user.id))
+
+        # Set cookie for local dev (optional, won't work cross-origin)
         set_session_cookie(response, token)
 
-        return UserResponse(id=cast(int, user.id), email=cast(str, user.email), name=cast(str, user.name))
+        # Return token in response body for cross-origin auth
+        return AuthResponse(
+            id=cast(int, user.id),
+            email=cast(str, user.email),
+            name=cast(str, user.name),
+            token=token
+        )
     except HTTPException:
         raise
     except SQLAlchemyError as e:
@@ -328,13 +358,13 @@ def register(user_data: UserCreate, response: Response, db: Session = Depends(ge
         raise HTTPException(status_code=500, detail="Failed to create account. Please try again.")
 
 
-@app.post("/api/auth/login", response_model=UserResponse)
+@app.post("/api/auth/login", response_model=AuthResponse)
 def login(user_data: UserLogin, response: Response, db: Session = Depends(get_db)):
     """
     Authenticate user and create session.
 
     Returns:
-        UserResponse with the user's info
+        AuthResponse with the user's info and authentication token
 
     Errors:
         401: Invalid email or password
@@ -345,10 +375,19 @@ def login(user_data: UserLogin, response: Response, db: Session = Depends(get_db
         if not user or not verify_password(user_data.password, cast(str, user.password_hash)):
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
+        # Create session token
         token = create_session_token(cast(int, user.id))
+
+        # Set cookie for local dev (optional, won't work cross-origin)
         set_session_cookie(response, token)
 
-        return UserResponse(id=cast(int, user.id), email=cast(str, user.email), name=cast(str, user.name))
+        # Return token in response body for cross-origin auth
+        return AuthResponse(
+            id=cast(int, user.id),
+            email=cast(str, user.email),
+            name=cast(str, user.name),
+            token=token
+        )
     except HTTPException:
         raise
     except SQLAlchemyError:
