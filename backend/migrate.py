@@ -12,7 +12,7 @@ elif DATABASE_URL.startswith("postgresql://") and "+psycopg" not in DATABASE_URL
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
 # Import models to register them with Base
-from .models import User, Group, GroupMember, Entry
+from .models import User, Group, GroupMember, Entry, ActivityType, HealthActivity, UserActivityFavorite
 
 # Create engine and create tables
 engine = create_engine(DATABASE_URL)
