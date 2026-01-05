@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import func
 
 from database import engine, get_db, Base
-from models import User, Group, GroupMember, Entry # type: ignore
+from models import User, Group, GroupMember, Entry, ActivityType, HealthActivity, UserActivityFavorite # type: ignore
 from auth import hash_password, verify_password, create_session_token, verify_session_token, create_password_reset_token, verify_password_reset_token
 from email_service import send_password_reset_email, is_email_configured
 
@@ -55,6 +55,99 @@ def set_session_cookie(response: Response, token: str) -> None:
 
 # Create tables
 Base.metadata.create_all(bind=engine)
+
+# ============== Seed Activity Types ==============
+
+ACTIVITY_TYPES_SEED = [
+    # Cardio (category: cardio)
+    {"name": "Walking", "category": "cardio", "icon": "footprints", "color": "emerald", "met_value": 3.5, "default_duration": 30, "display_order": 1},
+    {"name": "Running", "category": "cardio", "icon": "zap", "color": "red", "met_value": 9.8, "default_duration": 30, "display_order": 2},
+    {"name": "Jogging", "category": "cardio", "icon": "activity", "color": "orange", "met_value": 7.0, "default_duration": 30, "display_order": 3},
+    {"name": "Cycling", "category": "cardio", "icon": "bike", "color": "blue", "met_value": 7.5, "default_duration": 30, "display_order": 4},
+    {"name": "Swimming", "category": "cardio", "icon": "waves", "color": "cyan", "met_value": 8.0, "default_duration": 30, "display_order": 5},
+    {"name": "Jump Rope", "category": "cardio", "icon": "move", "color": "pink", "met_value": 12.0, "default_duration": 15, "display_order": 6},
+    {"name": "Stair Climbing", "category": "cardio", "icon": "trending-up", "color": "purple", "met_value": 8.0, "default_duration": 20, "display_order": 7},
+    {"name": "Elliptical", "category": "cardio", "icon": "circle", "color": "teal", "met_value": 5.0, "default_duration": 30, "display_order": 8},
+    {"name": "Rowing", "category": "cardio", "icon": "ship", "color": "indigo", "met_value": 7.0, "default_duration": 20, "display_order": 9},
+    {"name": "Dancing", "category": "cardio", "icon": "music", "color": "fuchsia", "met_value": 5.5, "default_duration": 30, "display_order": 10},
+
+    # Sports (category: sports)
+    {"name": "Cricket", "category": "sports", "icon": "circle-dot", "color": "yellow", "met_value": 5.0, "default_duration": 60, "display_order": 11},
+    {"name": "Badminton", "category": "sports", "icon": "circle-dot", "color": "lime", "met_value": 5.5, "default_duration": 45, "display_order": 12},
+    {"name": "Tennis", "category": "sports", "icon": "circle", "color": "green", "met_value": 7.0, "default_duration": 60, "display_order": 13},
+    {"name": "Football", "category": "sports", "icon": "circle", "color": "emerald", "met_value": 7.0, "default_duration": 60, "display_order": 14},
+    {"name": "Basketball", "category": "sports", "icon": "circle", "color": "orange", "met_value": 6.5, "default_duration": 45, "display_order": 15},
+    {"name": "Volleyball", "category": "sports", "icon": "circle", "color": "blue", "met_value": 4.0, "default_duration": 45, "display_order": 16},
+    {"name": "Table Tennis", "category": "sports", "icon": "circle-dot", "color": "red", "met_value": 4.0, "default_duration": 30, "display_order": 17},
+    {"name": "Golf", "category": "sports", "icon": "flag", "color": "green", "met_value": 4.5, "default_duration": 120, "display_order": 18},
+    {"name": "Hockey", "category": "sports", "icon": "goal", "color": "blue", "met_value": 8.0, "default_duration": 60, "display_order": 19},
+    {"name": "Squash", "category": "sports", "icon": "square", "color": "purple", "met_value": 7.5, "default_duration": 45, "display_order": 20},
+    {"name": "Rugby", "category": "sports", "icon": "shield", "color": "red", "met_value": 8.5, "default_duration": 60, "display_order": 21},
+    {"name": "Baseball", "category": "sports", "icon": "circle", "color": "white", "met_value": 5.0, "default_duration": 90, "display_order": 22},
+
+    # Strength & Fitness (category: strength)
+    {"name": "Gym Workout", "category": "strength", "icon": "dumbbell", "color": "purple", "met_value": 6.0, "default_duration": 45, "display_order": 23},
+    {"name": "Weight Training", "category": "strength", "icon": "dumbbell", "color": "slate", "met_value": 5.0, "default_duration": 45, "display_order": 24},
+    {"name": "HIIT", "category": "strength", "icon": "flame", "color": "red", "met_value": 8.0, "default_duration": 30, "display_order": 25},
+    {"name": "CrossFit", "category": "strength", "icon": "x", "color": "orange", "met_value": 8.0, "default_duration": 45, "display_order": 26},
+    {"name": "Calisthenics", "category": "strength", "icon": "user", "color": "blue", "met_value": 5.0, "default_duration": 30, "display_order": 27},
+    {"name": "Kettlebell", "category": "strength", "icon": "dumbbell", "color": "amber", "met_value": 6.0, "default_duration": 30, "display_order": 28},
+    {"name": "Circuit Training", "category": "strength", "icon": "repeat", "color": "green", "met_value": 8.0, "default_duration": 30, "display_order": 29},
+    {"name": "Functional Training", "category": "strength", "icon": "move", "color": "teal", "met_value": 5.0, "default_duration": 30, "display_order": 30},
+    {"name": "Pilates", "category": "strength", "icon": "sparkles", "color": "pink", "met_value": 3.0, "default_duration": 45, "display_order": 31},
+    {"name": "Core Workout", "category": "strength", "icon": "target", "color": "indigo", "met_value": 5.0, "default_duration": 20, "display_order": 32},
+
+    # Mind & Body (category: mind_body)
+    {"name": "Yoga", "category": "mind_body", "icon": "sparkles", "color": "violet", "met_value": 2.5, "default_duration": 45, "display_order": 33},
+    {"name": "Meditation", "category": "mind_body", "icon": "brain", "color": "purple", "met_value": 1.5, "default_duration": 20, "display_order": 34},
+    {"name": "Stretching", "category": "mind_body", "icon": "move", "color": "teal", "met_value": 2.5, "default_duration": 15, "display_order": 35},
+    {"name": "Tai Chi", "category": "mind_body", "icon": "wind", "color": "cyan", "met_value": 3.0, "default_duration": 30, "display_order": 36},
+    {"name": "Breathing Exercises", "category": "mind_body", "icon": "wind", "color": "sky", "met_value": 1.5, "default_duration": 10, "display_order": 37},
+    {"name": "Foam Rolling", "category": "mind_body", "icon": "circle", "color": "gray", "met_value": 2.0, "default_duration": 15, "display_order": 38},
+
+    # Outdoor & Adventure (category: outdoor)
+    {"name": "Hiking", "category": "outdoor", "icon": "mountain", "color": "green", "met_value": 6.0, "default_duration": 60, "display_order": 39},
+    {"name": "Rock Climbing", "category": "outdoor", "icon": "mountain", "color": "stone", "met_value": 8.0, "default_duration": 60, "display_order": 40},
+    {"name": "Kayaking", "category": "outdoor", "icon": "ship", "color": "blue", "met_value": 5.0, "default_duration": 45, "display_order": 41},
+    {"name": "Skiing", "category": "outdoor", "icon": "snowflake", "color": "sky", "met_value": 7.0, "default_duration": 60, "display_order": 42},
+    {"name": "Snowboarding", "category": "outdoor", "icon": "snowflake", "color": "cyan", "met_value": 5.5, "default_duration": 60, "display_order": 43},
+    {"name": "Surfing", "category": "outdoor", "icon": "waves", "color": "blue", "met_value": 3.0, "default_duration": 60, "display_order": 44},
+    {"name": "Skateboarding", "category": "outdoor", "icon": "square", "color": "gray", "met_value": 5.0, "default_duration": 30, "display_order": 45},
+    {"name": "Martial Arts", "category": "outdoor", "icon": "swords", "color": "red", "met_value": 10.0, "default_duration": 60, "display_order": 46},
+
+    # Home & Daily (category: home)
+    {"name": "Home Workout", "category": "home", "icon": "home", "color": "indigo", "met_value": 5.0, "default_duration": 30, "display_order": 47},
+    {"name": "Gardening", "category": "home", "icon": "flower", "color": "green", "met_value": 3.5, "default_duration": 45, "display_order": 48},
+    {"name": "Housework", "category": "home", "icon": "home", "color": "amber", "met_value": 3.0, "default_duration": 30, "display_order": 49},
+    {"name": "Dog Walking", "category": "home", "icon": "dog", "color": "amber", "met_value": 3.0, "default_duration": 30, "display_order": 50},
+    {"name": "Playing with Kids", "category": "home", "icon": "baby", "color": "pink", "met_value": 4.0, "default_duration": 30, "display_order": 51},
+    {"name": "Other", "category": "home", "icon": "activity", "color": "gray", "met_value": 4.0, "default_duration": 30, "display_order": 52},
+]
+
+def seed_activity_types():
+    """Seed activity types if they don't exist."""
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        # Check if already seeded
+        existing_count = db.query(ActivityType).count()
+        if existing_count > 0:
+            return  # Already seeded
+
+        for activity_data in ACTIVITY_TYPES_SEED:
+            activity = ActivityType(**activity_data)
+            db.add(activity)
+
+        db.commit()
+        print(f"Seeded {len(ACTIVITY_TYPES_SEED)} activity types")
+    except Exception as e:
+        db.rollback()
+        print(f"Error seeding activity types: {e}")
+    finally:
+        db.close()
+
+# Run seeding on startup
+seed_activity_types()
 
 app = FastAPI(title="Daily Tracker API")
 
@@ -274,6 +367,124 @@ class HistoryDay(BaseModel):
     date: date
     completed_sections: list[str]
     is_complete: bool
+
+
+# ============== Health Activity Schemas ==============
+
+class ActivityTypeResponse(BaseModel):
+    id: int
+    name: str
+    category: str
+    icon: str
+    color: str
+    met_value: float
+    default_duration: int
+
+
+class ActivityTypeGrouped(BaseModel):
+    category: str
+    activities: list[ActivityTypeResponse]
+
+
+class HealthActivityCreate(BaseModel):
+    group_id: int
+    activity_type_id: int
+    entry_date: Optional[date] = None
+    duration: Optional[int] = None
+    duration_unit: str = "minutes"
+    distance: Optional[float] = None
+    notes: Optional[str] = None
+
+    @field_validator('duration')
+    @classmethod
+    def validate_duration(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v < 0:
+            raise ValueError('Duration must be positive')
+        if v is not None and v > 1440:  # Max 24 hours in minutes
+            raise ValueError('Duration cannot exceed 24 hours')
+        return v
+
+    @field_validator('duration_unit')
+    @classmethod
+    def validate_duration_unit(cls, v: str) -> str:
+        if v not in ('minutes', 'hours'):
+            raise ValueError('Duration unit must be "minutes" or "hours"')
+        return v
+
+    @field_validator('notes')
+    @classmethod
+    def validate_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if len(v) > 500:
+                raise ValueError('Notes must be less than 500 characters')
+        return v if v else None
+
+
+class HealthActivityUpdate(BaseModel):
+    duration: Optional[int] = None
+    duration_unit: Optional[str] = None
+    distance: Optional[float] = None
+    notes: Optional[str] = None
+
+    @field_validator('duration')
+    @classmethod
+    def validate_duration(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v < 0:
+            raise ValueError('Duration must be positive')
+        if v is not None and v > 1440:
+            raise ValueError('Duration cannot exceed 24 hours')
+        return v
+
+    @field_validator('duration_unit')
+    @classmethod
+    def validate_duration_unit(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ('minutes', 'hours'):
+            raise ValueError('Duration unit must be "minutes" or "hours"')
+        return v
+
+
+class HealthActivityResponse(BaseModel):
+    id: int
+    activity_type: ActivityTypeResponse
+    duration: Optional[int]
+    duration_unit: str
+    distance: Optional[float]
+    calories: int
+    notes: Optional[str]
+    created_at: datetime
+
+
+class DailyHealthSummary(BaseModel):
+    date: date
+    activities: list[HealthActivityResponse]
+    summary: dict  # total_duration_minutes, total_calories, activity_count
+    legacy_content: Optional[str] = None  # For backward compatibility with old text entries
+
+
+class QuickLogRequest(BaseModel):
+    group_id: int
+    activity_type_id: int
+    entry_date: Optional[date] = None
+
+
+class FavoriteCreate(BaseModel):
+    activity_type_id: int
+
+
+class FavoriteResponse(BaseModel):
+    id: int
+    activity_type: ActivityTypeResponse
+    display_order: int
+
+
+class HealthAnalyticsResponse(BaseModel):
+    period: str
+    summary: dict
+    activity_breakdown: list[dict]
+    daily_trend: list[dict]
+    category_breakdown: list[dict]
+
 
 # ============== Auth Dependency ==============
 
@@ -1211,6 +1422,707 @@ def get_history(
         raise
     except SQLAlchemyError:
         raise HTTPException(status_code=500, detail="Failed to load history. Please try again.")
+
+
+# ============== Health Activity Endpoints ==============
+
+# Calorie calculation helper
+DEFAULT_WEIGHT_KG = 70  # Default weight for calorie calculation
+
+def calculate_calories(met_value: float, duration_minutes: int) -> int:
+    """
+    Calculate calories burned using MET formula.
+    Calories = MET * weight(kg) * duration(hours)
+    """
+    duration_hours = duration_minutes / 60
+    return round(met_value * DEFAULT_WEIGHT_KG * duration_hours)
+
+
+def build_activity_type_response(activity_type: ActivityType) -> ActivityTypeResponse:
+    """Build ActivityTypeResponse from ActivityType model."""
+    return ActivityTypeResponse(
+        id=cast(int, activity_type.id),
+        name=cast(str, activity_type.name),
+        category=cast(str, activity_type.category),
+        icon=cast(str, activity_type.icon),
+        color=cast(str, activity_type.color),
+        met_value=cast(float, activity_type.met_value),
+        default_duration=cast(int, activity_type.default_duration)
+    )
+
+
+def build_health_activity_response(activity: HealthActivity) -> HealthActivityResponse:
+    """Build HealthActivityResponse from HealthActivity model."""
+    return HealthActivityResponse(
+        id=cast(int, activity.id),
+        activity_type=build_activity_type_response(activity.activity_type),
+        duration=activity.duration,
+        duration_unit=cast(str, activity.duration_unit),
+        distance=activity.distance,
+        calories=cast(int, activity.calories),
+        notes=activity.notes,
+        created_at=activity.created_at
+    )
+
+
+@app.get("/api/activity-types", response_model=list[ActivityTypeGrouped])
+def get_activity_types(db: Session = Depends(get_db)):
+    """
+    Get all active activity types grouped by category.
+
+    Returns:
+        List of ActivityTypeGrouped objects with activities organized by category
+
+    Errors:
+        500: Database error
+    """
+    try:
+        activities = db.query(ActivityType).filter(
+            ActivityType.is_active == True
+        ).order_by(ActivityType.display_order).all()
+
+        # Group by category
+        categories: dict[str, list[ActivityTypeResponse]] = {}
+        category_order = ["cardio", "sports", "strength", "mind_body", "outdoor", "home"]
+
+        for activity in activities:
+            category = cast(str, activity.category)
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(build_activity_type_response(activity))
+
+        # Return in defined order
+        result = []
+        for cat in category_order:
+            if cat in categories:
+                result.append(ActivityTypeGrouped(category=cat, activities=categories[cat]))
+
+        return result
+    except SQLAlchemyError:
+        raise HTTPException(status_code=500, detail="Failed to load activity types. Please try again.")
+
+
+@app.get("/api/health-activities", response_model=DailyHealthSummary)
+def get_health_activities(
+    group_id: int,
+    entry_date: Optional[date] = None,
+    user_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get health activities for a specific date.
+
+    Args:
+        group_id: The group to get activities for
+        entry_date: Date to get activities for (defaults to today)
+        user_id: Optional user ID filter (owner-only)
+
+    Returns:
+        DailyHealthSummary with activities and summary stats
+
+    Errors:
+        401: Not authenticated
+        403: Not a member of this group, or non-owner trying to view other users' data
+        404: Group not found
+        500: Database error
+    """
+    try:
+        # Verify group exists
+        group = db.query(Group).filter(Group.id == group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        # Verify membership
+        is_member = db.query(GroupMember).filter(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == current_user.id
+        ).first()
+
+        if not is_member:
+            raise HTTPException(status_code=403, detail="You are not a member of this group")
+
+        # Determine which user's data to fetch
+        target_user_id = current_user.id
+
+        if user_id is not None:
+            if not verify_group_owner(db, group_id, current_user.id):
+                raise HTTPException(status_code=403, detail="Only group owners can view other members' data")
+            target_user_id = user_id
+
+        target_date = entry_date or date.today()
+
+        # Get health activities
+        activities = db.query(HealthActivity).filter(
+            HealthActivity.user_id == target_user_id,
+            HealthActivity.group_id == group_id,
+            HealthActivity.date == target_date
+        ).order_by(HealthActivity.created_at).all()
+
+        # Calculate summary
+        total_duration = 0
+        total_calories = 0
+        for a in activities:
+            if a.duration:
+                duration_mins = a.duration if a.duration_unit == "minutes" else a.duration * 60
+                total_duration += duration_mins
+            total_calories += cast(int, a.calories)
+
+        # Check for legacy text entry
+        legacy_entry = db.query(Entry).filter(
+            Entry.user_id == target_user_id,
+            Entry.group_id == group_id,
+            Entry.section == "health",
+            Entry.date == target_date
+        ).first()
+
+        legacy_content = cast(str, legacy_entry.content) if legacy_entry else None
+
+        return DailyHealthSummary(
+            date=target_date,
+            activities=[build_health_activity_response(a) for a in activities],
+            summary={
+                "total_duration_minutes": total_duration,
+                "total_calories": total_calories,
+                "activity_count": len(activities)
+            },
+            legacy_content=legacy_content
+        )
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        raise HTTPException(status_code=500, detail="Failed to load health activities. Please try again.")
+
+
+@app.post("/api/health-activities", response_model=HealthActivityResponse)
+def create_health_activity(
+    data: HealthActivityCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Log a new health activity.
+
+    Returns:
+        HealthActivityResponse with the created activity
+
+    Errors:
+        400: Validation error, future date
+        401: Not authenticated
+        403: Not a member of this group
+        404: Group or activity type not found
+        500: Database error
+    """
+    try:
+        # Verify group exists
+        group = db.query(Group).filter(Group.id == data.group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        # Verify membership
+        is_member = db.query(GroupMember).filter(
+            GroupMember.group_id == data.group_id,
+            GroupMember.user_id == current_user.id
+        ).first()
+
+        if not is_member:
+            raise HTTPException(status_code=403, detail="You are not a member of this group")
+
+        # Verify activity type exists
+        activity_type = db.query(ActivityType).filter(
+            ActivityType.id == data.activity_type_id,
+            ActivityType.is_active == True
+        ).first()
+
+        if not activity_type:
+            raise HTTPException(status_code=404, detail="Activity type not found")
+
+        entry_date = data.entry_date or date.today()
+
+        # Validate date is not in the future
+        if entry_date > date.today():
+            raise HTTPException(status_code=400, detail="Cannot log activities for future dates")
+
+        # Calculate calories
+        duration_mins = data.duration or cast(int, activity_type.default_duration)
+        if data.duration_unit == "hours":
+            duration_mins = duration_mins * 60
+
+        calories = calculate_calories(cast(float, activity_type.met_value), duration_mins)
+
+        # Create activity
+        activity = HealthActivity(
+            user_id=current_user.id,
+            group_id=data.group_id,
+            activity_type_id=data.activity_type_id,
+            date=entry_date,
+            duration=data.duration,
+            duration_unit=data.duration_unit,
+            distance=data.distance,
+            calories=calories,
+            notes=data.notes
+        )
+        db.add(activity)
+        db.commit()
+        db.refresh(activity)
+
+        return build_health_activity_response(activity)
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to log activity. Please try again.")
+
+
+@app.put("/api/health-activities/{activity_id}", response_model=HealthActivityResponse)
+def update_health_activity(
+    activity_id: int,
+    data: HealthActivityUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update an existing health activity.
+
+    Returns:
+        HealthActivityResponse with the updated activity
+
+    Errors:
+        401: Not authenticated
+        403: Cannot update another user's activity
+        404: Activity not found
+        500: Database error
+    """
+    try:
+        activity = db.query(HealthActivity).filter(HealthActivity.id == activity_id).first()
+        if not activity:
+            raise HTTPException(status_code=404, detail="Activity not found")
+
+        if activity.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Cannot update another user's activity")
+
+        # Update fields if provided
+        if data.duration is not None:
+            activity.duration = data.duration  # type: ignore[assignment]
+        if data.duration_unit is not None:
+            activity.duration_unit = data.duration_unit  # type: ignore[assignment]
+        if data.distance is not None:
+            activity.distance = data.distance  # type: ignore[assignment]
+        if data.notes is not None:
+            activity.notes = data.notes  # type: ignore[assignment]
+
+        # Recalculate calories
+        duration_mins = activity.duration or cast(int, activity.activity_type.default_duration)
+        if activity.duration_unit == "hours":
+            duration_mins = duration_mins * 60
+
+        activity.calories = calculate_calories(cast(float, activity.activity_type.met_value), duration_mins)  # type: ignore[assignment]
+        activity.updated_at = datetime.utcnow()  # type: ignore[assignment]
+
+        db.commit()
+        db.refresh(activity)
+
+        return build_health_activity_response(activity)
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update activity. Please try again.")
+
+
+@app.delete("/api/health-activities/{activity_id}")
+def delete_health_activity(
+    activity_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a health activity.
+
+    Returns:
+        Success message
+
+    Errors:
+        401: Not authenticated
+        403: Cannot delete another user's activity
+        404: Activity not found
+        500: Database error
+    """
+    try:
+        activity = db.query(HealthActivity).filter(HealthActivity.id == activity_id).first()
+        if not activity:
+            raise HTTPException(status_code=404, detail="Activity not found")
+
+        if activity.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Cannot delete another user's activity")
+
+        db.delete(activity)
+        db.commit()
+
+        return {"message": "Activity deleted successfully"}
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete activity. Please try again.")
+
+
+@app.post("/api/health-activities/quick-log", response_model=HealthActivityResponse)
+def quick_log_activity(
+    data: QuickLogRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Quick log an activity with default duration.
+
+    Returns:
+        HealthActivityResponse with the created activity
+
+    Errors:
+        401: Not authenticated
+        403: Not a member of this group
+        404: Group or activity type not found
+        500: Database error
+    """
+    try:
+        # Verify group exists
+        group = db.query(Group).filter(Group.id == data.group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        # Verify membership
+        is_member = db.query(GroupMember).filter(
+            GroupMember.group_id == data.group_id,
+            GroupMember.user_id == current_user.id
+        ).first()
+
+        if not is_member:
+            raise HTTPException(status_code=403, detail="You are not a member of this group")
+
+        # Verify activity type exists
+        activity_type = db.query(ActivityType).filter(
+            ActivityType.id == data.activity_type_id,
+            ActivityType.is_active == True
+        ).first()
+
+        if not activity_type:
+            raise HTTPException(status_code=404, detail="Activity type not found")
+
+        entry_date = data.entry_date or date.today()
+
+        # Validate date is not in the future
+        if entry_date > date.today():
+            raise HTTPException(status_code=400, detail="Cannot log activities for future dates")
+
+        # Use default duration
+        default_duration = cast(int, activity_type.default_duration)
+        calories = calculate_calories(cast(float, activity_type.met_value), default_duration)
+
+        # Create activity
+        activity = HealthActivity(
+            user_id=current_user.id,
+            group_id=data.group_id,
+            activity_type_id=data.activity_type_id,
+            date=entry_date,
+            duration=default_duration,
+            duration_unit="minutes",
+            calories=calories
+        )
+        db.add(activity)
+        db.commit()
+        db.refresh(activity)
+
+        return build_health_activity_response(activity)
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to log activity. Please try again.")
+
+
+# ============== Favorites Endpoints ==============
+
+@app.get("/api/health-activities/favorites", response_model=list[FavoriteResponse])
+def get_favorites(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get user's favorite activities for quick-log.
+
+    Returns:
+        List of FavoriteResponse objects sorted by display_order
+
+    Errors:
+        401: Not authenticated
+        500: Database error
+    """
+    try:
+        favorites = db.query(UserActivityFavorite).filter(
+            UserActivityFavorite.user_id == current_user.id
+        ).order_by(UserActivityFavorite.display_order).all()
+
+        return [
+            FavoriteResponse(
+                id=cast(int, f.id),
+                activity_type=build_activity_type_response(f.activity_type),
+                display_order=cast(int, f.display_order)
+            )
+            for f in favorites
+        ]
+    except SQLAlchemyError:
+        raise HTTPException(status_code=500, detail="Failed to load favorites. Please try again.")
+
+
+@app.post("/api/health-activities/favorites", response_model=FavoriteResponse)
+def add_favorite(
+    data: FavoriteCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Add an activity to favorites.
+
+    Returns:
+        FavoriteResponse with the created favorite
+
+    Errors:
+        400: Already a favorite
+        401: Not authenticated
+        404: Activity type not found
+        500: Database error
+    """
+    try:
+        # Verify activity type exists
+        activity_type = db.query(ActivityType).filter(
+            ActivityType.id == data.activity_type_id,
+            ActivityType.is_active == True
+        ).first()
+
+        if not activity_type:
+            raise HTTPException(status_code=404, detail="Activity type not found")
+
+        # Check if already favorited
+        existing = db.query(UserActivityFavorite).filter(
+            UserActivityFavorite.user_id == current_user.id,
+            UserActivityFavorite.activity_type_id == data.activity_type_id
+        ).first()
+
+        if existing:
+            raise HTTPException(status_code=400, detail="Activity already in favorites")
+
+        # Get next display order
+        max_order = db.query(func.max(UserActivityFavorite.display_order)).filter(
+            UserActivityFavorite.user_id == current_user.id
+        ).scalar() or 0
+
+        favorite = UserActivityFavorite(
+            user_id=current_user.id,
+            activity_type_id=data.activity_type_id,
+            display_order=max_order + 1
+        )
+        db.add(favorite)
+        db.commit()
+        db.refresh(favorite)
+
+        return FavoriteResponse(
+            id=cast(int, favorite.id),
+            activity_type=build_activity_type_response(activity_type),
+            display_order=cast(int, favorite.display_order)
+        )
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to add favorite. Please try again.")
+
+
+@app.delete("/api/health-activities/favorites/{activity_type_id}")
+def remove_favorite(
+    activity_type_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Remove an activity from favorites.
+
+    Returns:
+        Success message
+
+    Errors:
+        401: Not authenticated
+        404: Favorite not found
+        500: Database error
+    """
+    try:
+        favorite = db.query(UserActivityFavorite).filter(
+            UserActivityFavorite.user_id == current_user.id,
+            UserActivityFavorite.activity_type_id == activity_type_id
+        ).first()
+
+        if not favorite:
+            raise HTTPException(status_code=404, detail="Favorite not found")
+
+        db.delete(favorite)
+        db.commit()
+
+        return {"message": "Favorite removed successfully"}
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to remove favorite. Please try again.")
+
+
+# ============== Health Analytics Endpoint ==============
+
+@app.get("/api/analytics/health", response_model=HealthAnalyticsResponse)
+def get_health_analytics(
+    group_id: int,
+    period: str = "month",
+    user_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get health analytics for a user in a group.
+
+    Args:
+        group_id: The group to get analytics for
+        period: Time period - "week", "month", or "year"
+        user_id: Optional user ID filter (owner-only)
+
+    Returns:
+        HealthAnalyticsResponse with summary, breakdowns, and trends
+
+    Errors:
+        400: Invalid period
+        401: Not authenticated
+        403: Not a member, or non-owner viewing others
+        404: Group not found
+        500: Database error
+    """
+    try:
+        # Validate period
+        if period not in ("week", "month", "year"):
+            raise HTTPException(status_code=400, detail="Period must be 'week', 'month', or 'year'")
+
+        # Verify group exists
+        group = db.query(Group).filter(Group.id == group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        # Verify membership
+        is_member = db.query(GroupMember).filter(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == current_user.id
+        ).first()
+
+        if not is_member:
+            raise HTTPException(status_code=403, detail="You are not a member of this group")
+
+        # Determine which user's data to fetch
+        target_user_id = current_user.id
+
+        if user_id is not None:
+            if not verify_group_owner(db, group_id, current_user.id):
+                raise HTTPException(status_code=403, detail="Only group owners can view other members' data")
+            target_user_id = user_id
+
+        # Calculate date range
+        today = date.today()
+        if period == "week":
+            start_date = today - timedelta(days=7)
+        elif period == "month":
+            start_date = today - timedelta(days=30)
+        else:  # year
+            start_date = today - timedelta(days=365)
+
+        # Get activities in range
+        activities = db.query(HealthActivity).filter(
+            HealthActivity.user_id == target_user_id,
+            HealthActivity.group_id == group_id,
+            HealthActivity.date >= start_date
+        ).all()
+
+        # Calculate summary
+        total_activities = len(activities)
+        total_duration = 0
+        total_calories = 0
+        active_dates = set()
+
+        for a in activities:
+            active_dates.add(a.date)
+            total_calories += cast(int, a.calories)
+            if a.duration:
+                duration_mins = a.duration if a.duration_unit == "minutes" else a.duration * 60
+                total_duration += duration_mins
+
+        # Activity breakdown by type
+        activity_counts: dict[int, dict] = {}
+        for a in activities:
+            type_id = cast(int, a.activity_type_id)
+            if type_id not in activity_counts:
+                activity_counts[type_id] = {
+                    "activity_type": build_activity_type_response(a.activity_type).__dict__,
+                    "count": 0,
+                    "duration": 0,
+                    "calories": 0
+                }
+            activity_counts[type_id]["count"] += 1
+            activity_counts[type_id]["calories"] += cast(int, a.calories)
+            if a.duration:
+                duration_mins = a.duration if a.duration_unit == "minutes" else a.duration * 60
+                activity_counts[type_id]["duration"] += duration_mins
+
+        # Calculate percentages
+        activity_breakdown = []
+        for data in sorted(activity_counts.values(), key=lambda x: x["count"], reverse=True):
+            data["percentage"] = round((data["count"] / total_activities * 100) if total_activities > 0 else 0, 1)
+            activity_breakdown.append(data)
+
+        # Daily trend
+        daily_data: dict[date, dict] = {}
+        for a in activities:
+            d = a.date
+            if d not in daily_data:
+                daily_data[d] = {"date": d.isoformat(), "calories": 0, "duration_minutes": 0, "activities": 0}
+            daily_data[d]["calories"] += cast(int, a.calories)
+            daily_data[d]["activities"] += 1
+            if a.duration:
+                duration_mins = a.duration if a.duration_unit == "minutes" else a.duration * 60
+                daily_data[d]["duration_minutes"] += duration_mins
+
+        daily_trend = sorted(daily_data.values(), key=lambda x: x["date"])
+
+        # Category breakdown
+        category_counts: dict[str, dict] = {}
+        for a in activities:
+            category = cast(str, a.activity_type.category)
+            if category not in category_counts:
+                category_counts[category] = {"category": category, "count": 0, "calories": 0}
+            category_counts[category]["count"] += 1
+            category_counts[category]["calories"] += cast(int, a.calories)
+
+        category_breakdown = sorted(category_counts.values(), key=lambda x: x["count"], reverse=True)
+
+        return HealthAnalyticsResponse(
+            period=period,
+            summary={
+                "total_activities": total_activities,
+                "total_duration_minutes": total_duration,
+                "total_calories": total_calories,
+                "active_days": len(active_dates)
+            },
+            activity_breakdown=activity_breakdown,
+            daily_trend=daily_trend,
+            category_breakdown=category_breakdown
+        )
+    except HTTPException:
+        raise
+    except SQLAlchemyError:
+        raise HTTPException(status_code=500, detail="Failed to load health analytics. Please try again.")
 
 
 # ============== Root ==============

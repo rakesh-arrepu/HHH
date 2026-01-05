@@ -29,6 +29,7 @@ import {
 } from '../components/ui'
 import { celebrateAllComplete, celebrateStreak } from '../components/ui/confetti'
 import { MemberSelector, type Member } from '../components/MemberSelector'
+import { HealthSection } from '../components/health'
 
 type Group = { id: number; name: string; is_owner: boolean }
 
@@ -100,6 +101,7 @@ export default function Journal() {
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
   const [members, setMembers] = useState<Member[]>([])
   const [currentUserId, setCurrentUserId] = useState<number>(0)
+  const [healthComplete, setHealthComplete] = useState(false)
   const prevCompleteRef = useRef(false)
   const datePickerRef = useRef<HTMLDivElement>(null)
 
@@ -123,6 +125,7 @@ export default function Journal() {
     if (selectedGroup) {
       loadMembers()
       loadEntriesForDate(selectedDate, selectedUserId)
+      loadHealthStatus(selectedDate, selectedUserId)
       loadStreak(selectedUserId)
       loadFilledDates(selectedUserId)
       // Reset selectedUserId when switching groups
@@ -135,13 +138,16 @@ export default function Journal() {
   useEffect(() => {
     if (selectedGroup) {
       loadEntriesForDate(selectedDate, selectedUserId)
+      loadHealthStatus(selectedDate, selectedUserId)
       loadStreak(selectedUserId)
       loadFilledDates(selectedUserId)
     }
   }, [selectedDate, selectedUserId])
 
   // Celebrate when all sections are completed
-  const completedCount = Object.keys(entries).length
+  // Count text entries (happiness, hela) plus health activities
+  const textEntriesCount = Object.keys(entries).filter(k => k !== 'health').length
+  const completedCount = textEntriesCount + (healthComplete ? 1 : 0)
   const isComplete = completedCount === 3
 
   useEffect(() => {
@@ -198,6 +204,23 @@ export default function Journal() {
     }
   }
 
+  const loadHealthStatus = async (date: string, userId?: number) => {
+    if (!selectedGroup) return
+    try {
+      const data = await api.getHealthActivities(selectedGroup, date, userId)
+      setHealthComplete(data.activities.length > 0)
+    } catch (err) {
+      console.error('Failed to load health status:', err)
+      setHealthComplete(false)
+    }
+  }
+
+  const handleHealthActivitiesChange = async () => {
+    await loadHealthStatus(selectedDate, selectedUserId)
+    loadStreak(selectedUserId)
+    loadFilledDates(selectedUserId)
+  }
+
   const loadFilledDates = async (userId?: number) => {
     if (!selectedGroup) return
     try {
@@ -249,13 +272,19 @@ export default function Journal() {
   }
 
   const navigateDate = (direction: 'prev' | 'next') => {
-    const current = new Date(selectedDate + 'T00:00:00')
+    // Parse date components to avoid timezone issues
+    const [year, month, day] = selectedDate.split('-').map(Number)
+    const current = new Date(year, month - 1, day) // month is 0-indexed
+
     if (direction === 'prev') {
       current.setDate(current.getDate() - 1)
     } else {
       current.setDate(current.getDate() + 1)
     }
-    const newDate = current.toISOString().split('T')[0]
+
+    // Format date using local components to avoid UTC conversion
+    const newDate = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`
+
     if (!isFutureDate(newDate)) {
       setSelectedDate(newDate)
     }
@@ -356,8 +385,13 @@ export default function Journal() {
             {/* Date Controls */}
             <div className="flex items-center gap-2 flex-wrap">
               <button
-                onClick={() => navigateDate('prev')}
-                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all"
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  navigateDate('prev')
+                }}
+                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all cursor-pointer"
                 title="Previous day"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -374,11 +408,18 @@ export default function Journal() {
               </button>
 
               <button
-                onClick={() => navigateDate('next')}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (canGoNext) {
+                    navigateDate('next')
+                  }
+                }}
                 disabled={!canGoNext}
                 className={`p-2 rounded-lg transition-all ${
                   canGoNext
-                    ? 'bg-white/5 hover:bg-white/10 text-white/60 hover:text-white'
+                    ? 'bg-white/5 hover:bg-white/10 text-white/60 hover:text-white cursor-pointer'
                     : 'bg-white/5 text-white/20 cursor-not-allowed'
                 }`}
                 title="Next day"
@@ -408,19 +449,12 @@ export default function Journal() {
               <div className="w-24 sm:w-32">
                 <ProgressBar value={completedCount} max={3} size="md" />
               </div>
-            </div>
-          </div>
-
-          {/* Date Display */}
-          <div className="mt-3 pt-3 border-t border-white/10">
-            <p className="text-white/60 text-sm text-center">
-              {formatDateDisplay(selectedDate)}
               {isComplete && (
-                <span className="ml-2 text-emerald-400">
-                  <Check className="w-4 h-4 inline" /> Complete!
+                <span className="flex items-center gap-1 text-emerald-400 text-sm">
+                  <Check className="w-4 h-4" /> Complete!
                 </span>
               )}
-            </p>
+            </div>
           </div>
 
           {/* Date Picker Dropdown - Positioned Absolutely */}
@@ -475,13 +509,23 @@ export default function Journal() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 + index * 0.1 }}
           >
-            <EntryCard
-              section={section}
-              content={entries[section.key] || ''}
-              onSave={(content) => saveEntry(section.key, content)}
-              saving={saving === section.key}
-              isViewingOthers={isViewingOthers}
-            />
+            {section.key === 'health' ? (
+              <HealthSection
+                groupId={selectedGroup!}
+                selectedDate={selectedDate}
+                isViewingOthers={isViewingOthers}
+                userId={selectedUserId}
+                onActivitiesChange={handleHealthActivitiesChange}
+              />
+            ) : (
+              <EntryCard
+                section={section}
+                content={entries[section.key] || ''}
+                onSave={(content) => saveEntry(section.key, content)}
+                saving={saving === section.key}
+                isViewingOthers={isViewingOthers}
+              />
+            )}
           </motion.div>
         ))}
       </div>

@@ -311,4 +311,206 @@ export const api = {
       `/analytics/history?${params}`
     )
   },
+
+  // ============== Health Activities ==============
+
+  // Activity Types
+  getActivityTypes: () =>
+    request<{
+      category: string
+      activities: {
+        id: number
+        name: string
+        category: string
+        icon: string
+        color: string
+        met_value: number
+        default_duration: number
+      }[]
+    }[]>('/activity-types'),
+
+  // Health Activities CRUD
+  getHealthActivities: (groupId: number, date?: string, userId?: number) => {
+    const params = new URLSearchParams({ group_id: String(groupId) })
+    if (date) params.append('entry_date', date)
+    if (userId !== undefined) params.append('user_id', String(userId))
+    return request<{
+      date: string
+      activities: {
+        id: number
+        activity_type: {
+          id: number
+          name: string
+          category: string
+          icon: string
+          color: string
+          met_value: number
+          default_duration: number
+        }
+        duration: number | null
+        duration_unit: string
+        distance: number | null
+        calories: number
+        notes: string | null
+        created_at: string
+      }[]
+      summary: {
+        total_duration_minutes: number
+        total_calories: number
+        activity_count: number
+      }
+      legacy_content: string | null
+    }>(`/health-activities?${params}`)
+  },
+
+  createHealthActivity: (data: {
+    group_id: number
+    activity_type_id: number
+    entry_date?: string
+    duration?: number
+    duration_unit?: string
+    distance?: number
+    notes?: string
+  }) =>
+    request<{
+      id: number
+      activity_type: {
+        id: number
+        name: string
+        category: string
+        icon: string
+        color: string
+        met_value: number
+        default_duration: number
+      }
+      duration: number | null
+      duration_unit: string
+      distance: number | null
+      calories: number
+      notes: string | null
+      created_at: string
+    }>('/health-activities', { method: 'POST', body: data }),
+
+  updateHealthActivity: (activityId: number, data: {
+    duration?: number
+    duration_unit?: string
+    distance?: number
+    notes?: string
+  }) =>
+    request<{
+      id: number
+      activity_type: {
+        id: number
+        name: string
+        category: string
+        icon: string
+        color: string
+        met_value: number
+        default_duration: number
+      }
+      duration: number | null
+      duration_unit: string
+      distance: number | null
+      calories: number
+      notes: string | null
+      created_at: string
+    }>(`/health-activities/${activityId}`, { method: 'PUT', body: data }),
+
+  deleteHealthActivity: (activityId: number) =>
+    request<{ message: string }>(`/health-activities/${activityId}`, { method: 'DELETE' }),
+
+  quickLogActivity: (data: { group_id: number; activity_type_id: number; entry_date?: string }) =>
+    request<{
+      id: number
+      activity_type: {
+        id: number
+        name: string
+        category: string
+        icon: string
+        color: string
+        met_value: number
+        default_duration: number
+      }
+      duration: number | null
+      duration_unit: string
+      distance: number | null
+      calories: number
+      notes: string | null
+      created_at: string
+    }>('/health-activities/quick-log', { method: 'POST', body: data }),
+
+  // Favorites
+  getFavorites: () =>
+    request<{
+      id: number
+      activity_type: {
+        id: number
+        name: string
+        category: string
+        icon: string
+        color: string
+        met_value: number
+        default_duration: number
+      }
+      display_order: number
+    }[]>('/health-activities/favorites'),
+
+  addFavorite: (activityTypeId: number) =>
+    request<{
+      id: number
+      activity_type: {
+        id: number
+        name: string
+        category: string
+        icon: string
+        color: string
+        met_value: number
+        default_duration: number
+      }
+      display_order: number
+    }>('/health-activities/favorites', { method: 'POST', body: { activity_type_id: activityTypeId } }),
+
+  removeFavorite: (activityTypeId: number) =>
+    request<{ message: string }>(`/health-activities/favorites/${activityTypeId}`, { method: 'DELETE' }),
+
+  // Health Analytics
+  getHealthAnalytics: (groupId: number, period: 'week' | 'month' | 'year' = 'month', userId?: number) => {
+    const params = new URLSearchParams({ group_id: String(groupId), period })
+    if (userId !== undefined) params.append('user_id', String(userId))
+    return request<{
+      period: string
+      summary: {
+        total_activities: number
+        total_duration_minutes: number
+        total_calories: number
+        active_days: number
+      }
+      activity_breakdown: {
+        activity_type: {
+          id: number
+          name: string
+          category: string
+          icon: string
+          color: string
+          met_value: number
+          default_duration: number
+        }
+        count: number
+        duration: number
+        calories: number
+        percentage: number
+      }[]
+      daily_trend: {
+        date: string
+        calories: number
+        duration_minutes: number
+        activities: number
+      }[]
+      category_breakdown: {
+        category: string
+        count: number
+        calories: number
+      }[]
+    }>(`/analytics/health?${params}`)
+  },
 }
