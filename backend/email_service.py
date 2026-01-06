@@ -9,7 +9,9 @@ Environment variables required:
 
 import os
 import logging
+import time
 from typing import Optional
+from threading import Lock
 
 from dotenv import load_dotenv
 import resend
@@ -28,6 +30,11 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # Initialize Resend API key
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
+
+# Rate limiting configuration (Resend free tier: 2 requests/second)
+_last_email_time = 0.0
+_email_lock = Lock()
+MIN_EMAIL_DELAY = 0.5  # 500ms between emails (stays under 2 req/sec limit)
 
 
 def is_email_configured() -> bool:
@@ -104,7 +111,10 @@ def get_email_base_template(title: str, main_content_html: str) -> str:
 
 def _send_email(to_email: str, subject: str, html: str, text: str) -> tuple[bool, Optional[str]]:
     """
-    Centralized email sending function using Resend API.
+    Centralized email sending function using Resend API with rate limiting.
+
+    Enforces a minimum delay between consecutive emails to prevent exceeding
+    Resend's free tier limit of 2 requests/second.
 
     Args:
         to_email: Recipient email address
@@ -115,34 +125,51 @@ def _send_email(to_email: str, subject: str, html: str, text: str) -> tuple[bool
     Returns:
         Tuple of (success: bool, error_message: Optional[str])
     """
+    global _last_email_time
+
     if not is_email_configured():
         logger.warning("Email service not configured (RESEND_API_KEY not set)")
         return False, "Email service not configured"
 
-    try:
-        params = {
-            "from": f"HHH Daily Tracker <{FROM_EMAIL}>",
-            "to": [to_email],
-            "subject": subject,
-            "html": html,
-            "text": text,
-        }
+    # Enforce rate limiting with thread-safe lock
+    with _email_lock:
+        # Calculate time since last email
+        current_time = time.time()
+        time_since_last = current_time - _last_email_time
 
-        email_response = resend.Emails.send(params)
+        # If we're sending too fast, add delay to respect rate limit
+        if time_since_last < MIN_EMAIL_DELAY:
+            delay = MIN_EMAIL_DELAY - time_since_last
+            logger.debug(f"Rate limiting: waiting {delay:.2f}s before sending to {to_email}")
+            time.sleep(delay)
 
-        if email_response and email_response.get("id"):
-            logger.info(f"Email sent successfully to {to_email}, id: {email_response['id']}, subject: {subject}")
-            return True, None
-        else:
-            logger.error(f"Failed to send email to {to_email}: No email ID returned")
-            return False, "Failed to send email"
+        try:
+            params = {
+                "from": f"HHH Daily Tracker <{FROM_EMAIL}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": html,
+                "text": text,
+            }
 
-    except resend.exceptions.ResendError as e:
-        logger.error(f"Resend API error sending email to {to_email}: {str(e)}")
-        return False, f"Email service error: {str(e)}"
-    except Exception as e:
-        logger.error(f"Unexpected error sending email to {to_email}: {str(e)}")
-        return False, f"Unexpected error: {str(e)}"
+            email_response = resend.Emails.send(params)
+
+            # Update last email time after successful send
+            _last_email_time = time.time()
+
+            if email_response and email_response.get("id"):
+                logger.info(f"Email sent successfully to {to_email}, id: {email_response['id']}, subject: {subject}")
+                return True, None
+            else:
+                logger.error(f"Failed to send email to {to_email}: No email ID returned")
+                return False, "Failed to send email"
+
+        except resend.exceptions.ResendError as e:
+            logger.error(f"Resend API error sending email to {to_email}: {str(e)}")
+            return False, f"Email service error: {str(e)}"
+        except Exception as e:
+            logger.error(f"Unexpected error sending email to {to_email}: {str(e)}")
+            return False, f"Unexpected error: {str(e)}"
 
 
 # ==== PASSWORD RESET (EXISTING) ====

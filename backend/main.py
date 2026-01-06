@@ -565,7 +565,9 @@ def register(user_data: UserCreate, response: Response, db: Session = Depends(ge
         if is_email_configured():
             success, error = send_welcome_email(user.email, user.name)
             if not success:
-                logger.warning(f"Failed to send welcome email to {user.email}: {error}")
+                logger.error(f"CRITICAL: Failed to send welcome email to {user.email}: {error}")
+            else:
+                logger.info(f"✓ Welcome email sent successfully to {user.email}")
 
         # Create session token
         token = create_session_token(cast(int, user.id))
@@ -934,18 +936,22 @@ def add_member(
         # Send emails to both member and owner (non-blocking)
         if is_email_configured():
             # Email to new member
-            success, error = send_member_added_email_to_member(
+            success1, error1 = send_member_added_email_to_member(
                 user.email, user.name, group.name, group_id, current_user.name
             )
-            if not success:
-                logger.warning(f"Failed to send member-added email to {user.email}: {error}")
+            if not success1:
+                logger.error(f"CRITICAL: Failed to send member-added email to {user.email}: {error1}")
 
             # Email to owner
-            success, error = send_member_added_email_to_owner(
+            success2, error2 = send_member_added_email_to_owner(
                 current_user.email, current_user.name, user.name, user.email, group.name, group_id
             )
-            if not success:
-                logger.warning(f"Failed to send member-added email to owner {current_user.email}: {error}")
+            if not success2:
+                logger.error(f"CRITICAL: Failed to send member-added email to owner {current_user.email}: {error2}")
+
+            # Log success if both emails sent
+            if success1 and success2:
+                logger.info(f"✓ Both member-added emails sent successfully for group '{group.name}' (ID: {group_id})")
 
         return MemberResponse(id=cast(int, member.id), user_id=cast(int, user.id), name=cast(str, user.name), email=cast(str, user.email))
     except HTTPException:
@@ -1063,18 +1069,22 @@ def transfer_ownership(
         # Send emails to both new owner and previous owner (non-blocking)
         if is_email_configured():
             # Email to new owner
-            success, error = send_ownership_transfer_email_to_new_owner(
+            success1, error1 = send_ownership_transfer_email_to_new_owner(
                 new_owner.email, new_owner.name, group.name, group_id, current_user.name
             )
-            if not success:
-                logger.warning(f"Failed to send ownership transfer email to new owner {new_owner.email}: {error}")
+            if not success1:
+                logger.error(f"CRITICAL: Failed to send ownership transfer email to new owner {new_owner.email}: {error1}")
 
             # Email to previous owner
-            success, error = send_ownership_transfer_email_to_previous_owner(
+            success2, error2 = send_ownership_transfer_email_to_previous_owner(
                 current_user.email, current_user.name, group.name, group_id, new_owner.name
             )
-            if not success:
-                logger.warning(f"Failed to send ownership transfer email to previous owner {current_user.email}: {error}")
+            if not success2:
+                logger.error(f"CRITICAL: Failed to send ownership transfer email to previous owner {current_user.email}: {error2}")
+
+            # Log success if both emails sent
+            if success1 and success2:
+                logger.info(f"✓ Both ownership transfer emails sent successfully for group '{group.name}' (ID: {group_id})")
 
         return {
             "message": f"Ownership transferred successfully to {new_owner.name}",
