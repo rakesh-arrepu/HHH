@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional, Literal, cast
 import os
 import re
+import logging
 from fastapi import FastAPI, Depends, HTTPException, Response, Cookie, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, field_validator
@@ -13,7 +14,18 @@ from sqlalchemy import func
 from database import engine, get_db, Base
 from models import User, Group, GroupMember, Entry, ActivityType, HealthActivity, UserActivityFavorite # type: ignore
 from auth import hash_password, verify_password, create_session_token, verify_session_token, create_password_reset_token, verify_password_reset_token
-from email_service import send_password_reset_email, is_email_configured
+from email_service import (
+    send_password_reset_email,
+    is_email_configured,
+    send_welcome_email,
+    send_member_added_email_to_member,
+    send_member_added_email_to_owner,
+    send_ownership_transfer_email_to_new_owner,
+    send_ownership_transfer_email_to_previous_owner
+)
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 # ============== Error Response Helper ==============
@@ -549,6 +561,12 @@ def register(user_data: UserCreate, response: Response, db: Session = Depends(ge
         db.commit()
         db.refresh(user)
 
+        # Send welcome email (non-blocking)
+        if is_email_configured():
+            success, error = send_welcome_email(user.email, user.name)
+            if not success:
+                logger.warning(f"Failed to send welcome email to {user.email}: {error}")
+
         # Create session token
         token = create_session_token(cast(int, user.id))
 
@@ -913,6 +931,22 @@ def add_member(
         db.commit()
         db.refresh(member)
 
+        # Send emails to both member and owner (non-blocking)
+        if is_email_configured():
+            # Email to new member
+            success, error = send_member_added_email_to_member(
+                user.email, user.name, group.name, group_id, current_user.name
+            )
+            if not success:
+                logger.warning(f"Failed to send member-added email to {user.email}: {error}")
+
+            # Email to owner
+            success, error = send_member_added_email_to_owner(
+                current_user.email, current_user.name, user.name, user.email, group.name, group_id
+            )
+            if not success:
+                logger.warning(f"Failed to send member-added email to owner {current_user.email}: {error}")
+
         return MemberResponse(id=cast(int, member.id), user_id=cast(int, user.id), name=cast(str, user.name), email=cast(str, user.email))
     except HTTPException:
         raise
@@ -1025,6 +1059,22 @@ def transfer_ownership(
         group.owner_id = request.new_owner_id  # type: ignore[assignment]
         db.commit()
         db.refresh(group)
+
+        # Send emails to both new owner and previous owner (non-blocking)
+        if is_email_configured():
+            # Email to new owner
+            success, error = send_ownership_transfer_email_to_new_owner(
+                new_owner.email, new_owner.name, group.name, group_id, current_user.name
+            )
+            if not success:
+                logger.warning(f"Failed to send ownership transfer email to new owner {new_owner.email}: {error}")
+
+            # Email to previous owner
+            success, error = send_ownership_transfer_email_to_previous_owner(
+                current_user.email, current_user.name, group.name, group_id, new_owner.name
+            )
+            if not success:
+                logger.warning(f"Failed to send ownership transfer email to previous owner {current_user.email}: {error}")
 
         return {
             "message": f"Ownership transferred successfully to {new_owner.name}",
